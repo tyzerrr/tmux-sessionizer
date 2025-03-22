@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -41,8 +42,18 @@ func (sh *SessionHandler) switchTo() error {
 	selected := strings.TrimSpace(fzfOut.String())
 	slog.Debug("switchTo", slog.String("selected session", selected))
 
-	if err := exec.Command("tmux", "attach-session", "-t", selected).Run(); err != nil {
-		return fmt.Errorf("failed to execute tmux attach-session -t command: %w", err)
+	/*
+	   When tmux try to attach, real tty is necessary.
+	   But as default, exec.Command provides virtual in-memory pipe.
+	   So tmux throws the error.
+	*/
+	cmd := exec.Command("tmux", "attach", "-t", selected)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to execute tmux attach -t: %w", err)
 	}
 	return nil
 }
