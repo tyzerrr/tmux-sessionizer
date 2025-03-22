@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -41,7 +42,7 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	if len(args) > 0 && args[0] == "list" {
 		return sh.GrabExistingSession()
 	} else if len(args) > 0 {
-		return fmt.Errorf("No such subcommands. See usage.")
+		return errors.New("no such subcommands")
 	} else {
 		return sh.NewSession()
 	}

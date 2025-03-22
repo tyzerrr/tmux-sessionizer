@@ -3,6 +3,7 @@ package handler
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,9 +12,7 @@ import (
 	"strings"
 )
 
-type SessionHandler struct {
-	config config
-}
+type SessionHandler struct{}
 
 type config struct {
 	projects []project
@@ -111,7 +110,7 @@ func (sh *SessionHandler) expandPath(path string) (string, error) {
 func (sh *SessionHandler) NewSession() error {
 	config := sh.readConfig()
 	if config == nil {
-		return fmt.Errorf("failed to create new project from projects")
+		return errors.New("failed to create new project from projects")
 	}
 	/*build fzf input and build hashmap to retrieve filepath from entry's name.*/
 	var input bytes.Buffer
@@ -126,8 +125,7 @@ func (sh *SessionHandler) NewSession() error {
 	}
 	sessionName := strings.Trim(fzfOut.String(), "\n")
 	if sh.sessionExists(sessionName) {
-		sh.attach(sessionName)
-		return nil
+		return sh.attach(sessionName)
 	}
 	if err := sh.newTmuxCmd(
 		"tmux", "new-session", "-s",
@@ -183,7 +181,7 @@ func (sh *SessionHandler) GrabExistingSession() error {
 	}
 	selected := strings.TrimSpace(fzfOut.String())
 	if err := sh.attach(selected); err != nil {
-		fmt.Errorf("failed to attache an existing session: %w", err)
+		return fmt.Errorf("failed to attache an existing session: %w", err)
 	}
 	return nil
 }
