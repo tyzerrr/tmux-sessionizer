@@ -119,8 +119,7 @@ func (sh *SessionHandler) newSessionFromProjects() error {
 	if config == nil {
 		return fmt.Errorf("failed to create new project from projects")
 	}
-
-	/*build fzf input*/
+	/*build fzf input and build hashmap to retrieve filepath from entry's name.*/
 	var input bytes.Buffer
 	projectHashMap := make(map[string]string, 0)
 	for _, project := range config.projects {
@@ -131,8 +130,36 @@ func (sh *SessionHandler) newSessionFromProjects() error {
 	if err != nil {
 		return fmt.Errorf("failed to create new project from projects: %w", err)
 	}
-	if err := sh.newTmuxCmd("tmux", "new-session", "-s", strings.Trim(fzfOut.String(), "\n"), "-c", projectHashMap[strings.Trim(fzfOut.String(), "\n")]).Run(); err != nil {
+	sessionName := strings.Trim(fzfOut.String(), "\n")
+	if sh.sessionExists(sessionName) {
+		sh.attach(sessionName)
+		return nil
+	}
+	if err := sh.newTmuxCmd(
+		"tmux", "new-session", "-s",
+		sessionName, "-c", projectHashMap[sessionName]).Run(); err != nil {
 		return fmt.Errorf("failed to create new session %w: ", err)
+	}
+	return nil
+}
+
+func (sh *SessionHandler) sessionExists(sessionName string) bool {
+	cmd := sh.newTmuxCmd("tmux", "has-session", "-t", sessionName)
+	if err := cmd.Run(); err == nil {
+		return true
+	}
+	return false
+}
+
+func (sh *SessionHandler) attach(sessionName string) error {
+	/*
+	   When tmux try to attach, real tty is necessary.
+	   But as default, exec.Command provides virtual in-memory pipe.
+	   So tmux throws the error.
+	*/
+	cmd := sh.newTmuxCmd("tmux", "attach", "-t", sessionName)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to execute tmux attach -t: %w", err)
 	}
 	return nil
 }
@@ -160,14 +187,8 @@ func (sh *SessionHandler) switchTo() error {
 		return fmt.Errorf("failed to execute fzf command: %w", err)
 	}
 	selected := strings.TrimSpace(fzfOut.String())
-	/*
-	   When tmux try to attach, real tty is necessary.
-	   But as default, exec.Command provides virtual in-memory pipe.
-	   So tmux throws the error.
-	*/
-	cmd := sh.newTmuxCmd("tmux", "attach", "-t", selected)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to execute tmux attach -t: %w", err)
+	if err := sh.attach(selected); err != nil {
+		fmt.Errorf("failed to attache an existing session: %w", err)
 	}
 	return nil
 }
