@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -31,13 +32,6 @@ func newConfig() *config {
 	return &config{
 		projects: []project{},
 	}
-}
-
-func (sh *SessionHandler) Start() error {
-	if err := sh.newSessionFromProjects(); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (sh *SessionHandler) newTmuxCmd(name string, args ...string) *exec.Cmd {
@@ -114,7 +108,7 @@ func (sh *SessionHandler) expandPath(path string) (string, error) {
 	return path, nil
 }
 
-func (sh *SessionHandler) newSessionFromProjects() error {
+func (sh *SessionHandler) NewSession() error {
 	config := sh.readConfig()
 	if config == nil {
 		return fmt.Errorf("failed to create new project from projects")
@@ -145,6 +139,7 @@ func (sh *SessionHandler) newSessionFromProjects() error {
 
 func (sh *SessionHandler) sessionExists(sessionName string) bool {
 	cmd := sh.newTmuxCmd("tmux", "has-session", "-t", sessionName)
+	cmd.Stderr = io.Discard
 	if err := cmd.Run(); err == nil {
 		return true
 	}
@@ -175,7 +170,7 @@ func (sh *SessionHandler) toFzf(input bytes.Buffer) (bytes.Buffer, error) {
 	return fzfOut, nil
 }
 
-func (sh *SessionHandler) switchTo() error {
+func (sh *SessionHandler) GrabExistingSession() error {
 	tmuxCmd := exec.Command("tmux", "list-sessions", "-F", "#{session_name}")
 	var tmuxOut bytes.Buffer
 	tmuxCmd.Stdout = &tmuxOut

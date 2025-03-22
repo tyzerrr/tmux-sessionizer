@@ -37,8 +37,12 @@ func newCmd() *cli.Command {
 
 func run(ctx context.Context, cmd *cli.Command) error {
 	sh := handler.NewSessionHandler()
-	if err := sh.Start(); err != nil {
-		return fmt.Errorf("failed to run tmux-sessionizer command: %w", err)
+	args := cmd.Args().Slice()
+	if len(args) > 0 && args[0] == "list" {
+		return sh.GrabExistingSession()
+	} else if len(args) > 0 {
+		return fmt.Errorf("No such subcommands. See usage.")
+	} else {
+		return sh.NewSession()
 	}
-	return nil
 }
