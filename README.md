@@ -13,6 +13,12 @@ Thank you, ThePrimeagen.
 
 ## Demo
 
+
+https://github.com/user-attachments/assets/be1d2732-38ee-41c7-9393-ecc6c0211048
+
+
+
+
 ## Installation
 You can install with homebrew.
 ```bash
