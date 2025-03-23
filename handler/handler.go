@@ -128,6 +128,9 @@ func (sh *SessionHandler) NewSession() error {
 		return fmt.Errorf("failed to create new project from projects: %w", err)
 	}
 	sessionName := strings.Trim(fzfOut.String(), "\n")
+	if sh.isInSession() {
+		return sh.switchToNewClient(sessionName, projectHashMap[sessionName])
+	}
 	if sh.sessionExists(sessionName) {
 		return sh.attach(sessionName)
 	}
@@ -161,6 +164,25 @@ func (sh *SessionHandler) attach(sessionName string) error {
 	return nil
 }
 
+func (sh *SessionHandler) switchClient(sessionName string) error {
+	cmd := sh.newTmuxCmd("tmux", "switch-client", "-t", sessionName)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to execute tmux switch-client -t: %w", err)
+	}
+	return nil
+}
+
+func (sh *SessionHandler) switchToNewClient(sessionName, path string) error {
+	if sh.sessionExists(sessionName) {
+		return sh.switchClient(sessionName)
+	}
+	cmd := sh.newTmuxCmd("tmux", "new-session", "-ds", sessionName, "-c", path)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to execute tmux new-sessio -ds %v -c %v: %w", sessionName, path, err)
+	}
+	return sh.switchClient(sessionName)
+}
+
 func (sh *SessionHandler) toFzf(input bytes.Buffer) (bytes.Buffer, error) {
 	fzfCmd := exec.Command("fzf")
 	fzfCmd.Stdin = &input
@@ -184,8 +206,15 @@ func (sh *SessionHandler) GrabExistingSession() error {
 		return fmt.Errorf("failed to execute fzf command: %w", err)
 	}
 	selected := strings.TrimSpace(fzfOut.String())
+	if sh.isInSession() {
+		return sh.switchClient(selected)
+	}
 	if err := sh.attach(selected); err != nil {
-		return fmt.Errorf("failed to attache an existing session: %w", err)
+		return fmt.Errorf("failed to attach an existing session: %w", err)
 	}
 	return nil
+}
+
+func (sh *SessionHandler) isInSession() bool {
+	return len(os.Getenv("TMUX")) > 0
 }

@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"os/signal"
 
@@ -22,7 +21,6 @@ func Core() int {
 
 	cmd := newCmd()
 	if err := cmd.Run(ctx, os.Args); err != nil {
-		fmt.Println(err)
 		return ExitCodeError
 	}
 	return ExitCodeOK
