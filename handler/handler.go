@@ -150,10 +150,7 @@ func (sh *SessionHandler) NewSession() error {
 func (sh *SessionHandler) sessionExists(sessionName string) bool {
 	cmd := sh.newTmuxCmd("tmux", "has-session", "-t", sessionName)
 	cmd.Stderr = io.Discard
-	if err := cmd.Run(); err == nil {
-		return true
-	}
-	return false
+	return cmd.Run() == nil
 }
 
 func (sh *SessionHandler) attach(sessionName string) error {
