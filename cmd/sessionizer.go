@@ -15,6 +15,10 @@ const (
 	ExitCodeError int = iota
 )
 
+var (
+	ErrNoSuchCmd = errors.New("no such command")
+)
+
 func Core() int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
@@ -36,12 +40,16 @@ func newCmd() *cli.Command {
 
 func run(ctx context.Context, cmd *cli.Command) error {
 	sh := handler.NewSessionHandler()
+	return runWithHandler(sh, ctx, cmd)
+}
+
+func runWithHandler(h handler.ISessionHandler, ctx context.Context, cmd *cli.Command) error {
 	args := cmd.Args().Slice()
 	if len(args) > 0 && args[0] == "list" {
-		return sh.GrabExistingSession()
+		return h.GrabExistingSession()
 	} else if len(args) > 0 {
-		return errors.New("no such subcommands")
+		return ErrNoSuchCmd
 	} else {
-		return sh.NewSession()
+		return h.NewSession()
 	}
 }

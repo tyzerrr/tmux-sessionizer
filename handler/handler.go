@@ -12,6 +12,11 @@ import (
 	"strings"
 )
 
+type ISessionHandler interface {
+	NewSession() error
+	GrabExistingSession() error
+}
+
 type SessionHandler struct{}
 
 type config struct {
@@ -23,7 +28,7 @@ type project struct {
 	filepath string
 }
 
-func NewSessionHandler() *SessionHandler {
+func NewSessionHandler() ISessionHandler {
 	return &SessionHandler{}
 }
 
