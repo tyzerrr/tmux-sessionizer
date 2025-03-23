@@ -51,10 +51,16 @@ release:
     ---
 
     Released by [GoReleaser](https://github.com/goreleaser/goreleaser).
+
 brews:
   - name: tmux-sessionizer
     homepage: "https://github.com/TlexCypher/tmux-sessionizer"
     description: "Tmux session manager with fzf"
+    repository:
+      owner: TlexCypher
+      name: homebrew-tap
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    directory: Formula
     install: |
       bin.install "tmux-sessionizer"
     test: |
