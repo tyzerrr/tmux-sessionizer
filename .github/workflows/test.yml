@@ -12,5 +12,5 @@ jobs:
           go-version-file: "go.mod"
       - name: Gather dependencies
         run: go mod download
-      - name: Run coverage
+      - name: Run test 
         run: go test -shuffle=on

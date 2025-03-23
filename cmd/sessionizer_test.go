@@ -41,6 +41,7 @@ type args struct {
 }
 
 func TestRun(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		args    args
@@ -70,7 +71,6 @@ func TestRun(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			cmd := newMockCmd()
@@ -78,7 +78,7 @@ func TestRun(t *testing.T) {
 			if tt.args.cmd != "" {
 				args = append(args, tt.args.cmd)
 			}
-			err := cmd.Run(context.Background(), args)
+			err := cmd.Run(t.Context(), args)
 			if !errors.Is(err, tt.wantErr) {
 				t.Errorf("expected error %v, got %v", tt.wantErr, err)
 			}
