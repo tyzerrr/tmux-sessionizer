@@ -36,7 +36,7 @@ https://github.com/user-attachments/assets/be1d2732-38ee-41c7-9393-ecc6c0211048
 ## Configuration (What You Must Do)
 You must write **.tmux-sessionizer**, config file.
 ```text
-default=~/personal, ~/projects, ./
+default=~/personal, ~/projects, ./ # comma separated, both absolute/relative are acceptable.
 ```
 
 tmux-sessionizer searches directories and displays them using fzf, but it does not search all directories.
