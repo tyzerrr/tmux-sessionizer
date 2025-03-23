@@ -2,7 +2,6 @@ package handler
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,13 +14,17 @@ func TestParseConfig(t *testing.T) {
 	projectDir1 := filepath.Join(tmpRoot, project1Name)
 	projectDir2 := filepath.Join(tmpRoot, project2Name)
 	projects := []string{projectDir1, projectDir2}
-	os.Mkdir(projectDir1, 0755)
-	os.Mkdir(projectDir2, 0755)
+	if err := os.Mkdir(projectDir1, 0755); err != nil {
+		t.Errorf("failed to make project1 directory")
+	}
+	if err := os.Mkdir(projectDir2, 0755); err != nil {
+		t.Errorf("failed to make project2 directory")
+	}
 
-	configContent := fmt.Sprintf("default=%s", tmpRoot)
+	configContent := "default=" + tmpRoot
 
 	tmpConfigFile := filepath.Join(tmpRoot, ".tmux-sessionizer")
-	if err := os.WriteFile(tmpConfigFile, []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(tmpConfigFile, []byte(configContent), 0600); err != nil {
 		t.Errorf("failed to write config file: %v", err)
 	}
 
@@ -73,7 +76,6 @@ func TestExpandPath(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			sh := SessionHandler{}
