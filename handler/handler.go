@@ -53,7 +53,11 @@ func (sh *SessionHandler) readConfig() *config {
 }
 
 func (sh *SessionHandler) parseConfig(configFile string) (*config, error) {
-	file, err := os.Open(configFile)
+	path, err := sh.expandPath(configFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to expand path: %w", err)
+	}
+	file, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open config file: %w", err)
 	}
