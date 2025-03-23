@@ -25,11 +25,3 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
-brews:
-  - name: tmux-sessionizer
-    tap:
-      owner: TlexCypher
-      name: homebrew-tap
-      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
-    homepage: "https://github.com/TlexCypher/tmux-sessionizer"
-

@@ -51,3 +51,10 @@ release:
     ---
 
     Released by [GoReleaser](https://github.com/goreleaser/goreleaser).
+brews:
+  - name: tmux-sessionizer
+    tap:
+      owner: TlexCypher
+      name: homebrew-tap
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    homepage: "https://github.com/TlexCypher/tmux-sessionizer"
