@@ -12,7 +12,7 @@ And this project is inspired https://github.com/theprimeagen/tmux-sessionizer.
 Thank you, ThePrimeagen.
 
 ## Usage
-**tmux-sessionizer** provides two commands.
+**tmux-sessionizer** provides four commands.
 1. **tmux-sessionizer**
 
 ```bash
@@ -28,6 +28,20 @@ Once selected, tmux-sessionizer will either attach to the existing tmux session 
 tmux-sessionizer list
 ```
 Displays the list of existing tmux-sessions defined and when you hit enter attach the target session.
+
+3. **tmux-sessionizer create**
+```bash
+tmux-sessionizer create
+```
+Displays interactive interface to create new directory and a new associated tmux session.
+
+4. **tmux-sessionizer delete**
+```bash
+tmux-sessionizer delete
+```
+Displays interactive interface to delete existing tmux sessions.
+
+**Don't worry, associated directory is not deleted.**
 
 ## Demo
 
