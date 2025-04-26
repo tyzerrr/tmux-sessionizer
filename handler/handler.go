@@ -15,8 +15,6 @@ import (
 	"github.com/manifoldco/promptui"
 )
 
-var configFiles = []string{"./.tmux-sessionizer", "~/.tmux-sessionizer"}
-
 type ISessionHandler interface {
 	NewSession(ctx context.Context) error
 	GrabExistingSession(ctx context.Context) error
@@ -53,6 +51,7 @@ func (sh *SessionHandler) newTmuxCmd(name string, args ...string) *exec.Cmd {
 }
 
 func (sh *SessionHandler) readConfig() *config {
+	var configFiles = []string{"./.tmux-sessionizer", "~/.tmux-sessionizer"}
 	for _, cf := range configFiles {
 		config, err := sh.parseConfig(cf)
 		if err == nil {
@@ -235,16 +234,17 @@ func (sh *SessionHandler) GrabExistingSession(ctx context.Context) error {
 	return nil
 }
 
-func (sh *SessionHandler) CreateNewProjectSession(ctx context.Context) error {
-	parentDirCandidatesSet := make(map[string]struct{}, 0)
+func (sh *SessionHandler) buildParentDirSet() (map[string]struct{}, error) {
+	var configFiles = []string{"./.tmux-sessionizer", "~/.tmux-sessionizer"}
+	parentDirSet := make(map[string]struct{}, 0)
 	for _, configFile := range configFiles {
 		path, err := sh.expandPath(configFile)
 		if err != nil {
-			return fmt.Errorf("failed to expand path: %w", err)
+			return nil, fmt.Errorf("failed to expand path: %w", err)
 		}
 		file, err := os.Open(path)
 		if err != nil {
-			return fmt.Errorf("failed to open config file: %w", err)
+			return nil, fmt.Errorf("failed to open config file: %w", err)
 		}
 		defer file.Close()
 
@@ -257,33 +257,48 @@ func (sh *SessionHandler) CreateNewProjectSession(ctx context.Context) error {
 				projects := strings.Split(raw, ",")
 				for _, pr := range projects {
 					trimmed := strings.TrimSpace(pr)
-					parentDirCandidatesSet[trimmed] = struct{}{}
+					parentDirSet[trimmed] = struct{}{}
 				}
 			}
 		}
 	}
+	return parentDirSet, nil
+}
 
-	parentDirCandidates := make([]string, 0)
-	for key, _ := range parentDirCandidatesSet {
-		parentDirCandidates = append(parentDirCandidates, key)
+func (sh *SessionHandler) getNewProjectInfo(parentDirs []string) (string, string, error) {
+	chooseParentDirPrompt := promptui.Select{
+		Label: "Which project do you choose to create a new project (session) ?",
+		Items: parentDirs,
+	}
+	_, parentDir, err := chooseParentDirPrompt.Run()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to choose a parent directory: %w", err)
+	}
+
+	newProjectNamePrompt := promptui.Prompt{
+		Label: "Enter a new project name",
+	}
+	newProjectName, err := newProjectNamePrompt.Run()
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get a new project name: %w", err)
+	}
+	return parentDir, newProjectName, nil
+}
+
+func (sh *SessionHandler) CreateNewProjectSession(ctx context.Context) error {
+	parentDirSet, err := sh.buildParentDirSet()
+	if err != nil {
+		return fmt.Errorf("failed to build parent directory set: %w", err)
+	}
+	parentDirs := make([]string, 0)
+	for key := range parentDirSet {
+		parentDirs = append(parentDirs, key)
 	}
 
 	for {
-		chooseParentDirPrompt := promptui.Select{
-			Label: "Which project do you choose to create a new project (session) ?",
-			Items: parentDirCandidates,
-		}
-		_, parentDir, err := chooseParentDirPrompt.Run()
+		parentDir, newProjectName, err := sh.getNewProjectInfo(parentDirs)
 		if err != nil {
-			return fmt.Errorf("failed to choose a parent directory: %w", err)
-		}
-
-		newProjectNamePrompt := promptui.Prompt{
-			Label: "Enter a new project name",
-		}
-		newProjectName, err := newProjectNamePrompt.Run()
-		if err != nil {
-			return fmt.Errorf("failed to get a new project name: %w", err)
+			return fmt.Errorf("faield to get new project information interactively: %w", err)
 		}
 		newProjectPath, err := sh.expandPath(filepath.Join(parentDir, fmt.Sprintf("%v/", newProjectName)))
 		if err != nil {
