@@ -46,10 +46,12 @@ func run(ctx context.Context, cmd *cli.Command) error {
 func runWithHandler(h handler.ISessionHandler, ctx context.Context, cmd *cli.Command) error {
 	args := cmd.Args().Slice()
 	if len(args) > 0 && args[0] == "list" {
-		return h.GrabExistingSession()
+		return h.GrabExistingSession(ctx)
+	} else if len(args) > 0 && args[0] == "create" {
+		return h.CreateNewProjectSession(ctx)
 	} else if len(args) > 0 {
 		return ErrNoSuchCmd
 	} else {
-		return h.NewSession()
+		return h.NewSession(ctx)
 	}
 }

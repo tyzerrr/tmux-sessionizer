@@ -3,6 +3,7 @@ package handler
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -10,11 +11,16 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/manifoldco/promptui"
 )
 
+var configFiles = []string{"./.tmux-sessionizer", "~/.tmux-sessionizer"}
+
 type ISessionHandler interface {
-	NewSession() error
-	GrabExistingSession() error
+	NewSession(ctx context.Context) error
+	GrabExistingSession(ctx context.Context) error
+	CreateNewProjectSession(ctx context.Context) error
 }
 
 type SessionHandler struct{}
@@ -47,7 +53,6 @@ func (sh *SessionHandler) newTmuxCmd(name string, args ...string) *exec.Cmd {
 }
 
 func (sh *SessionHandler) readConfig() *config {
-	configFiles := []string{"./.tmux-sessionizer", "~/.tmux-sessionizer"}
 	for _, cf := range configFiles {
 		config, err := sh.parseConfig(cf)
 		if err == nil {
@@ -124,7 +129,7 @@ func (sh *SessionHandler) replaceHomeDir(fullpath string) (string, error) {
 	return strings.Replace(fullpath, home, "~", 1), nil
 }
 
-func (sh *SessionHandler) NewSession() error {
+func (sh *SessionHandler) NewSession(ctx context.Context) error {
 	config := sh.readConfig()
 	if config == nil {
 		return errors.New("failed to create new project from projects")
@@ -209,7 +214,7 @@ func (sh *SessionHandler) toFzf(input bytes.Buffer) (bytes.Buffer, error) {
 	return fzfOut, nil
 }
 
-func (sh *SessionHandler) GrabExistingSession() error {
+func (sh *SessionHandler) GrabExistingSession(ctx context.Context) error {
 	tmuxCmd := exec.Command("tmux", "list-sessions", "-F", "#{session_name}")
 	var tmuxOut bytes.Buffer
 	tmuxCmd.Stdout = &tmuxOut
@@ -226,6 +231,85 @@ func (sh *SessionHandler) GrabExistingSession() error {
 	}
 	if err := sh.attach(selected); err != nil {
 		return fmt.Errorf("failed to attach an existing session: %w", err)
+	}
+	return nil
+}
+
+func (sh *SessionHandler) CreateNewProjectSession(ctx context.Context) error {
+	parentDirCandidatesSet := make(map[string]struct{}, 0)
+	for _, configFile := range configFiles {
+		path, err := sh.expandPath(configFile)
+		if err != nil {
+			return fmt.Errorf("failed to expand path: %w", err)
+		}
+		file, err := os.Open(path)
+		if err != nil {
+			return fmt.Errorf("failed to open config file: %w", err)
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.HasPrefix(line, "default=") {
+				raw := strings.TrimPrefix(line, "default=")
+				projects := strings.Split(raw, ",")
+				for _, pr := range projects {
+					trimmed := strings.TrimSpace(pr)
+					parentDirCandidatesSet[trimmed] = struct{}{}
+				}
+			}
+		}
+	}
+
+	parentDirCandidates := make([]string, 0)
+	for key, _ := range parentDirCandidatesSet {
+		parentDirCandidates = append(parentDirCandidates, key)
+	}
+
+	for {
+		chooseParentDirPrompt := promptui.Select{
+			Label: "Which project do you choose to create a new project (session) ?",
+			Items: parentDirCandidates,
+		}
+		_, parentDir, err := chooseParentDirPrompt.Run()
+		if err != nil {
+			return fmt.Errorf("failed to choose a parent directory: %w", err)
+		}
+
+		newProjectNamePrompt := promptui.Prompt{
+			Label: "Enter a new project name",
+		}
+		newProjectName, err := newProjectNamePrompt.Run()
+		if err != nil {
+			return fmt.Errorf("failed to get a new project name: %w", err)
+		}
+		newProjectPath, err := sh.expandPath(filepath.Join(parentDir, fmt.Sprintf("%v/", newProjectName)))
+		if err != nil {
+			return fmt.Errorf("failed to expand path: %w", err)
+		}
+		_, err = os.Stat(newProjectPath)
+		if err == nil {
+			fmt.Printf("%v is already exist\n", newProjectPath)
+			continue
+		}
+		if os.IsNotExist(err) {
+			if err := exec.Command("mkdir", "-p", newProjectPath).Run(); err != nil {
+				return fmt.Errorf("failed to create a new project: %w", err)
+			}
+			if sh.isInSession() {
+				return sh.switchToNewClient(newProjectName, newProjectPath)
+			}
+			if err := sh.newTmuxCmd(
+				"tmux", "new-session", "-s",
+				newProjectName, "-c", newProjectPath).Run(); err != nil {
+				return fmt.Errorf("failed to create new session %w: ", err)
+			}
+			break
+		} else {
+			return fmt.Errorf("failed to create a new project: %w", err)
+		}
 	}
 	return nil
 }

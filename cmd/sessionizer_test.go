@@ -28,11 +28,15 @@ func newMockSessionHandler() handler.ISessionHandler {
 	return &MockSessionHandler{}
 }
 
-func (mh *MockSessionHandler) NewSession() error {
+func (mh *MockSessionHandler) NewSession(ctx context.Context) error {
 	return nil
 }
 
-func (mh *MockSessionHandler) GrabExistingSession() error {
+func (mh *MockSessionHandler) GrabExistingSession(ctx context.Context) error {
+	return nil
+}
+
+func (mh *MockSessionHandler) CreateNewProjectSession(ctx context.Context) error {
 	return nil
 }
 
