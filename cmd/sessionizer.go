@@ -49,6 +49,8 @@ func runWithHandler(h handler.ISessionHandler, ctx context.Context, cmd *cli.Com
 		return h.GrabExistingSession(ctx)
 	} else if len(args) > 0 && args[0] == "create" {
 		return h.CreateNewProjectSession(ctx)
+	} else if len(args) > 0 && args[0] == "delete" {
+		return h.DeleteProjectSession(ctx)
 	} else if len(args) > 0 {
 		return ErrNoSuchCmd
 	} else {

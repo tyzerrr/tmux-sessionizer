@@ -19,6 +19,7 @@ type ISessionHandler interface {
 	NewSession(ctx context.Context) error
 	GrabExistingSession(ctx context.Context) error
 	CreateNewProjectSession(ctx context.Context) error
+	DeleteProjectSession(ctx context.Context) error
 }
 
 type SessionHandler struct{}
@@ -325,6 +326,34 @@ func (sh *SessionHandler) CreateNewProjectSession(ctx context.Context) error {
 		} else {
 			return fmt.Errorf("failed to create a new project: %w", err)
 		}
+	}
+	return nil
+}
+
+func (sh *SessionHandler) getSessionInfoToDelete(existingProjects []string) (string, error) {
+	deleteSessionPrompt := promptui.Select{
+		Label: "Which tmux session do you want to delete?",
+		Items: existingProjects,
+	}
+	_, deleteSessionName, err := deleteSessionPrompt.Run()
+	if err != nil {
+		return "", err
+	}
+	return deleteSessionName, nil
+}
+
+func (sh *SessionHandler) DeleteProjectSession(ctx context.Context) error {
+	out, err := exec.Command("tmux", "list-sessions", "-F", "#{session_name}").Output()
+	if err != nil {
+		return fmt.Errorf("failed to execute tmux list-sessions cmd: %w", err)
+	}
+	sessions := strings.Split(strings.TrimSpace(string(out)), "\n")
+	deleteSession, err := sh.getSessionInfoToDelete(sessions)
+	if err != nil {
+		return fmt.Errorf("failed to get a session name to delete: %w", err)
+	}
+	if err = sh.newTmuxCmd("tmux", "kill-session", "-t", deleteSession).Run(); err != nil {
+		return fmt.Errorf("failed to kill session: %w", err)
 	}
 	return nil
 }

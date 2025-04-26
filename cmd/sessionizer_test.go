@@ -40,6 +40,10 @@ func (mh *MockSessionHandler) CreateNewProjectSession(ctx context.Context) error
 	return nil
 }
 
+func (mh *MockSessionHandler) DeleteProjectSession(ctx context.Context) error {
+	return nil
+}
+
 type args struct {
 	cmd string
 }
