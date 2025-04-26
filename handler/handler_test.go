@@ -81,11 +81,48 @@ func TestExpandPath(t *testing.T) {
 			sh := SessionHandler{}
 			got, err := sh.expandPath(tt.args.relative)
 			if err != nil && !errors.Is(err, tt.wantErr) {
-				t.Errorf("failed to expand path: %v.", err)
+				t.Errorf("failed to expand path: %v", err)
 				return
 			}
 			if got != tt.want {
 				t.Errorf("failed to expandPath. expected: %v, but got %v", tt.want, got)
+			}
+		})
+	}
+}
+
+func TestReplaceHomeDir(t *testing.T) {
+	t.Parallel()
+	homeDir, _ := os.UserHomeDir()
+	type args struct {
+		fullpath string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr error
+	}{
+		{
+			name: "Normal test case1",
+			args: args{
+				fullpath: filepath.Join(homeDir, "a/b/c"),
+			},
+			want:    "~/a/b/c",
+			wantErr: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			sh := SessionHandler{}
+			got, err := sh.replaceHomeDir(tt.args.fullpath)
+			if err != nil && !errors.Is(err, tt.wantErr) {
+				t.Errorf("failed to replace home directory: %v", err)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("failed to replace home directory, expected: %v, but got %v", tt.want, got)
 			}
 		})
 	}

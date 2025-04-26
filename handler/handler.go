@@ -116,6 +116,14 @@ func (sh *SessionHandler) expandPath(path string) (string, error) {
 	return path, nil
 }
 
+func (sh *SessionHandler) replaceHomeDir(fullpath string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return strings.Replace(fullpath, home, "~", 1), nil
+}
+
 func (sh *SessionHandler) NewSession() error {
 	config := sh.readConfig()
 	if config == nil {
@@ -123,25 +131,30 @@ func (sh *SessionHandler) NewSession() error {
 	}
 	/*build fzf input and build hashmap to retrieve filepath from entry's name.*/
 	var input bytes.Buffer
-	projectHashMap := make(map[string]string, 0)
+	projectNameFullPathMap, projectExpressionNameMap := make(map[string]string, 0), make(map[string]string, 0)
 	for _, project := range config.projects {
-		input.WriteString(project.name + "\n")
-		projectHashMap[project.name] = project.filepath
+		replaced, err := sh.replaceHomeDir(project.filepath)
+		if err != nil {
+			return errors.New("failed to replace home directory to ~")
+		}
+		input.WriteString(replaced + "\n")
+		projectNameFullPathMap[project.name] = project.filepath
+		projectExpressionNameMap[replaced] = project.name
 	}
 	fzfOut, err := sh.toFzf(input)
 	if err != nil {
 		return fmt.Errorf("failed to create new project from projects: %w", err)
 	}
-	sessionName := strings.Trim(fzfOut.String(), "\n")
+	sessionName := projectExpressionNameMap[strings.Trim(fzfOut.String(), "\n")]
 	if sh.isInSession() {
-		return sh.switchToNewClient(sessionName, projectHashMap[sessionName])
+		return sh.switchToNewClient(sessionName, projectNameFullPathMap[sessionName])
 	}
 	if sh.sessionExists(sessionName) {
 		return sh.attach(sessionName)
 	}
 	if err := sh.newTmuxCmd(
 		"tmux", "new-session", "-s",
-		sessionName, "-c", projectHashMap[sessionName]).Run(); err != nil {
+		sessionName, "-c", projectNameFullPathMap[sessionName]).Run(); err != nil {
 		return fmt.Errorf("failed to create new session %w: ", err)
 	}
 	return nil
