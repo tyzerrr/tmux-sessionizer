@@ -245,6 +245,9 @@ func (sh *SessionHandler) buildParentDirSet() (map[string]struct{}, error) {
 		}
 		file, err := os.Open(path)
 		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
 			return nil, fmt.Errorf("failed to open config file: %w", err)
 		}
 		defer file.Close()
