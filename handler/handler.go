@@ -36,7 +36,7 @@ func (sh *SessionHandler) NewSession(ctx context.Context) error {
 	/*build fzf input and build hashmap to retrieve filepath from entry's name.*/
 	var input bytes.Buffer
 	for _, project := range sh.config.Projects {
-		replaced, err := sh.pathResolver.ReplaceHomeDir(project.filepath)
+		replaced, err := sh.pathResolver.ExpandPath(project.filepath)
 		if err != nil {
 			return errors.New("failed to replace home directory to ~")
 		}

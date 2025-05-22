@@ -25,19 +25,11 @@ func (p *PathResolver) ExpandPath(path string) (string, error) {
 	return path, nil
 }
 
-func (p *PathResolver) ReplaceHomeDir(fullpath string) (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return strings.Replace(fullpath, home, "~", 1), nil
-}
-
 func (p *PathResolver) BuildProjectInfo(config *Config) (map[string]string, map[string]string, error) {
 	var input bytes.Buffer
 	projectNameFullPathMap, projectExpressionNameMap := make(map[string]string, 0), make(map[string]string, 0)
 	for _, project := range config.Projects {
-		replaced, err := p.ReplaceHomeDir(project.filepath)
+		replaced, err := p.ExpandPath(project.filepath)
 		if err != nil {
 			return nil, nil, errors.New("failed to replace home directory to ~")
 		}
