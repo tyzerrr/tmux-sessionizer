@@ -39,7 +39,9 @@ func newCmd() *cli.Command {
 }
 
 func run(ctx context.Context, cmd *cli.Command) error {
-	sh := handler.NewSessionHandler()
+	pathResolver := handler.NewPathResolver()
+	configParser := handler.NewConfigParser(pathResolver)
+	sh := handler.NewSessionHandler(configParser, pathResolver)
 	return runWithHandler(sh, ctx, cmd)
 }
 
