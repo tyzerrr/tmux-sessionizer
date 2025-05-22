@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,4 +31,19 @@ func (p *PathResolver) ReplaceHomeDir(fullpath string) (string, error) {
 		return "", err
 	}
 	return strings.Replace(fullpath, home, "~", 1), nil
+}
+
+func (p *PathResolver) BuildProjectInfo(config *Config) (map[string]string, map[string]string, error) {
+	var input bytes.Buffer
+	projectNameFullPathMap, projectExpressionNameMap := make(map[string]string, 0), make(map[string]string, 0)
+	for _, project := range config.Projects {
+		replaced, err := p.ReplaceHomeDir(project.filepath)
+		if err != nil {
+			return nil, nil, errors.New("failed to replace home directory to ~")
+		}
+		input.WriteString(replaced + "\n")
+		projectNameFullPathMap[project.name] = project.filepath
+		projectExpressionNameMap[replaced] = project.name
+	}
+	return projectNameFullPathMap, projectExpressionNameMap, nil
 }

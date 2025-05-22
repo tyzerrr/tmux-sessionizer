@@ -15,56 +15,48 @@ import (
 	"github.com/manifoldco/promptui"
 )
 
-type ISessionHandler interface {
-	NewSession(ctx context.Context) error
-	GrabExistingSession(ctx context.Context) error
-	CreateNewProjectSession(ctx context.Context) error
-	DeleteProjectSession(ctx context.Context) error
-}
-
 type SessionHandler struct {
-	c IConfigParser
-	p IPathResolver
+	config                   *Config
+	pathResolver             *PathResolver
+	projectNameFullPathMap   map[string]string
+	projectExpressionNameMap map[string]string
 }
 
-func NewSessionHandler(configParser IConfigParser, pathResolver IPathResolver) ISessionHandler {
+func NewSessionHandler(config *Config, pathResolver *PathResolver,
+	projectNameFullPathMap, projectExpressionNameMap map[string]string) ISessionHandler {
 	return &SessionHandler{
-		c: configParser,
-		p: pathResolver,
+		config:                   config,
+		pathResolver:             pathResolver,
+		projectNameFullPathMap:   projectNameFullPathMap,
+		projectExpressionNameMap: projectExpressionNameMap,
 	}
 }
 
 func (sh *SessionHandler) NewSession(ctx context.Context) error {
-	config := sh.c.ReadConfig()
-	if config == nil {
-		return errors.New("failed to create new project from projects")
-	}
 	/*build fzf input and build hashmap to retrieve filepath from entry's name.*/
 	var input bytes.Buffer
-	projectNameFullPathMap, projectExpressionNameMap := make(map[string]string, 0), make(map[string]string, 0)
-	for _, project := range config.Projects {
-		replaced, err := sh.p.ReplaceHomeDir(project.filepath)
+	for _, project := range sh.config.Projects {
+		replaced, err := sh.pathResolver.ReplaceHomeDir(project.filepath)
 		if err != nil {
 			return errors.New("failed to replace home directory to ~")
 		}
 		input.WriteString(replaced + "\n")
-		projectNameFullPathMap[project.name] = project.filepath
-		projectExpressionNameMap[replaced] = project.name
 	}
 	fzfOut, err := sh.toFzf(input)
 	if err != nil {
 		return fmt.Errorf("failed to create new project from projects: %w", err)
 	}
-	sessionName := projectExpressionNameMap[strings.Trim(fzfOut.String(), "\n")]
+
+	sessionName := sh.projectExpressionNameMap[strings.Trim(fzfOut.String(), "\n")]
 	if sh.isInSession() {
-		return sh.switchToNewClient(sessionName, projectNameFullPathMap[sessionName])
+		return sh.switchToNewClient(sessionName, sh.projectNameFullPathMap[sessionName])
 	}
 	if sh.sessionExists(sessionName) {
 		return sh.attach(sessionName)
 	}
 	if err := sh.newTmuxCmd(
 		"tmux", "new-session", "-s",
-		sessionName, "-c", projectNameFullPathMap[sessionName]).Run(); err != nil {
+		sessionName, "-c", sh.projectNameFullPathMap[sessionName]).Run(); err != nil {
 		return fmt.Errorf("failed to create new session %w: ", err)
 	}
 	return nil
@@ -106,7 +98,7 @@ func (sh *SessionHandler) CreateNewProjectSession(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("faield to get new project information interactively: %w", err)
 		}
-		newProjectPath, err := sh.p.ExpandPath(filepath.Join(parentDir, fmt.Sprintf("%v/", newProjectName)))
+		newProjectPath, err := sh.pathResolver.ExpandPath(filepath.Join(parentDir, fmt.Sprintf("%v/", newProjectName)))
 		if err != nil {
 			return fmt.Errorf("failed to expand path: %w", err)
 		}
@@ -212,7 +204,7 @@ func (sh *SessionHandler) buildParentDirSet() (map[string]struct{}, error) {
 	var configFiles = []string{"./.tmux-sessionizer", "~/.tmux-sessionizer"}
 	parentDirSet := make(map[string]struct{}, 0)
 	for _, configFile := range configFiles {
-		path, err := sh.p.ExpandPath(configFile)
+		path, err := sh.pathResolver.ExpandPath(configFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to expand path: %w", err)
 		}

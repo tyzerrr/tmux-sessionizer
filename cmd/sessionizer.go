@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/signal"
 
@@ -40,8 +41,15 @@ func newCmd() *cli.Command {
 
 func run(ctx context.Context, cmd *cli.Command) error {
 	pathResolver := handler.NewPathResolver()
-	configParser := handler.NewConfigParser(pathResolver)
-	sh := handler.NewSessionHandler(configParser, pathResolver)
+	config, err := handler.NewConfigParser(pathResolver).ReadConfig()
+	if err != nil {
+		return fmt.Errorf("failed to run tmux-sessionizer because failed to read configration files: %w", err)
+	}
+	projectNameFullPathMap, projectExpressionNameMap, err := pathResolver.BuildProjectInfo(config)
+	if err != nil {
+		return fmt.Errorf("failed to build project information from .tmux-sessionizer config files: %w", err)
+	}
+	sh := handler.NewSessionHandler(config, pathResolver, projectNameFullPathMap, projectExpressionNameMap)
 	return runWithHandler(sh, ctx, cmd)
 }
 

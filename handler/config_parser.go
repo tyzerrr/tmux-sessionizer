@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,15 +34,17 @@ func NewConfigParser(pr *PathResolver) *ConfigParser {
 	}
 }
 
-func (c *ConfigParser) ReadConfig() *Config {
+func (c *ConfigParser) ReadConfig() (*Config, error) {
 	var configFiles = []string{"./.tmux-sessionizer", "~/.tmux-sessionizer"}
 	for _, cf := range configFiles {
 		config, err := c.ParseConfig(cf)
 		if err == nil {
-			return config
+			return config, nil
+		} else {
+			return nil, err
 		}
 	}
-	return nil
+	return nil, errors.New("failed to read both config files, ${pwd}/.tmux-sessionizer, ${HOME}/.tmux-sessionizer")
 }
 
 func (c *ConfigParser) ParseConfig(configFile string) (*Config, error) {
