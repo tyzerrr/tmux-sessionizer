@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 
 golangci-lint run --fix
-go test ./... -v
+go test -race -coverprofile=coverage.txt -covermode=atomic ./...
 go fmt ./...

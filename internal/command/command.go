@@ -2,24 +2,27 @@ package command
 
 import (
 	"bytes"
-	"fmt"
+	"context"
+	"errors"
 	"os/exec"
 )
 
 var (
-	ErrTmuxCmdNoOutBuf = fmt.Errorf("tmux command has no output buffer")
+	ErrTmuxCmdNoOutBuf = errors.New("tmux command has no output buffer")
 )
 
 type FzfCommand struct {
 	*exec.Cmd
+
 	inBuf  *bytes.Buffer
 	outBuf *bytes.Buffer
 }
 
-func NewFzfCommand() *FzfCommand {
-	cmd := exec.Command("fzf")
+func NewFzfCommand(ctx context.Context) *FzfCommand {
+	cmd := exec.CommandContext(ctx, "fzf")
 	inBuf, outBuf := &bytes.Buffer{}, &bytes.Buffer{}
 	cmd.Stdin, cmd.Stdout = inBuf, outBuf
+
 	return &FzfCommand{
 		Cmd:    cmd,
 		inBuf:  inBuf,
@@ -28,9 +31,11 @@ func NewFzfCommand() *FzfCommand {
 }
 
 func (fc *FzfCommand) Run() error {
-	if err := fc.Cmd.Run(); err != nil {
+	err := fc.Cmd.Run()
+	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -44,16 +49,17 @@ func (fc *FzfCommand) OutBuf() *bytes.Buffer {
 
 type TmuxCommand struct {
 	*exec.Cmd
+
 	outBuf *bytes.Buffer
 }
 
-func NewTmuxCommand(args ...string) *TmuxCommand {
-	cmd := exec.Command("tmux", args...)
+func NewTmuxCommand(ctx context.Context, args ...string) *TmuxCommand {
+	cmd := exec.CommandContext(ctx, "tmux", args...)
 	ob := &bytes.Buffer{}
 	cmd.Stdout = ob
 	/*
 	   When tmux try to attach, real tty is necessary.
-	   But as default, exec.Command provides virtual in-memory pipe.
+	   But as default, exec.CommandContext provides virtual in-memory pipe.
 	   So tmux throws the error.
 	*/
 	return &TmuxCommand{
@@ -70,12 +76,20 @@ func (tc *TmuxCommand) Run() error {
 	if tc.Stdout == nil {
 		return ErrTmuxCmdNoOutBuf
 	}
-	if err := tc.Cmd.Run(); err != nil {
+
+	err := tc.Cmd.Run()
+	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
 func (tc *TmuxCommand) Out() []byte {
-	return tc.Stdout.(*bytes.Buffer).Bytes()
+	buf, ok := tc.Stdout.(*bytes.Buffer)
+	if !ok {
+		return nil
+	}
+
+	return buf.Bytes()
 }
