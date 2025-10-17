@@ -12,6 +12,7 @@ import (
 	iohelper "github.com/TlexCypher/my-tmux-sessionizer/internal/io"
 	"github.com/TlexCypher/my-tmux-sessionizer/internal/session"
 	"github.com/TlexCypher/my-tmux-sessionizer/internal/tmux"
+	"github.com/TlexCypher/my-tmux-sessionizer/internal/types"
 	"github.com/urfave/cli/v3"
 )
 
@@ -80,8 +81,12 @@ func run(ctx context.Context, cmd *cli.Command) error {
 
 	sessions, err := tmux.GatherExistingSessions(ctx)
 	if err != nil {
-		fmt.Println("Warning: could not gather existing tmux sessions:", err)
-		return err
+		if sessions != nil {
+			fmt.Println("could not gather existing tmux sessions even for tmux has started:", err)
+			return err
+		}
+
+		sessions = make(map[types.String]*session.Session, 0)
 	}
 
 	sm := session.NewSessionManager(sessions)
