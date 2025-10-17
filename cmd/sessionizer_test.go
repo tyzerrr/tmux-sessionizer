@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/TlexCypher/my-tmux-sessionizer/handler"
@@ -50,6 +51,9 @@ type args struct {
 
 func TestRun(t *testing.T) {
 	t.Parallel()
+
+	var mu sync.RWMutex
+
 	tests := []struct {
 		name    string
 		args    args
@@ -81,12 +85,20 @@ func TestRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			cmd := newMockCmd()
+
 			args := []string{"tmux-sessionizer"}
 			if tt.args.cmd != "" {
 				args = append(args, tt.args.cmd)
 			}
+
+			mu.Lock()
+
 			err := cmd.Run(t.Context(), args)
+
+			mu.Unlock()
+
 			if !errors.Is(err, tt.wantErr) {
 				t.Errorf("expected error %v, got %v", tt.wantErr, err)
 			}

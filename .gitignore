@@ -3,3 +3,4 @@ tmux-sessionizer
 # Added by goreleaser init:
 dist/
 my-tmux-sessionizer
+coverage.txt

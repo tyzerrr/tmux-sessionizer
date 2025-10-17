@@ -1,13 +1,13 @@
 package session
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/TlexCypher/my-tmux-sessionizer/internal/types"
 )
 
 var (
-	ErrSessionNotFound = fmt.Errorf("session not found")
+	ErrSessionNotFound = errors.New("session not found")
 )
 
 type SessionManager struct {
@@ -25,14 +25,15 @@ func (sm *SessionManager) CreateSession(rawName string, rawPath string) *Session
 	if _, exists := sm.sessions[projectPath]; !exists {
 		sm.sessions[projectPath] = NewSession(name, projectPath)
 	}
+
 	return sm.sessions[projectPath]
 }
 
-func (sm *SessionManager) ListSessions() []*Session {
-	var sessions []*Session
+func (sm *SessionManager) ListSessions() (sessions []*Session) {
 	for _, v := range sm.sessions {
 		sessions = append(sessions, v)
 	}
+
 	return sessions
 }
 
@@ -41,5 +42,6 @@ func (sm *SessionManager) GetSession(rawPath string) (*Session, error) {
 	if session, exists := sm.sessions[projectPath]; exists {
 		return session, nil
 	}
+
 	return nil, ErrSessionNotFound
 }

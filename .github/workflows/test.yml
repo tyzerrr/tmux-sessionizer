@@ -13,4 +13,4 @@ jobs:
       - name: Gather dependencies
         run: go mod download
       - name: Run test 
-        run: go test -shuffle=on
+        run: go test -shuffle=on -race -coverprofile=coverage.txt -covermode=atomic ./...

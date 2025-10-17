@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	ExitCodeOK        = 0
-	ExitCodeError int = iota
+	ExitCodeOK int = iota
+	ExitCodeError
 )
 
 const (
@@ -38,10 +38,13 @@ func Core() int {
 	defer stop()
 
 	cmd := newCmd()
-	if err := cmd.Run(ctx, os.Args); err != nil {
+
+	err := cmd.Run(ctx, os.Args)
+	if err != nil {
 		fmt.Println(err)
 		return ExitCodeError
 	}
+
 	return ExitCodeOK
 }
 
@@ -55,11 +58,14 @@ func newCmd() *cli.Command {
 
 func run(ctx context.Context, cmd *cli.Command) error {
 	filepathResolver := iohelper.NewFilePathResolver()
+
 	configFile, err := filepathResolver.ExpandTildeAsHomeDir(configFile)
 	if err != nil {
 		return err
 	}
+
 	configParser := iohelper.NewConfigParser()
+
 	configFileAbs, err := filepath.Abs(configFile)
 	if err != nil {
 		return err
@@ -69,14 +75,18 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
+
 	tmux := tmux.NewTmux()
-	sessions, err := tmux.GatherExistingSessions()
+
+	sessions, err := tmux.GatherExistingSessions(ctx)
 	if err != nil {
 		fmt.Println("Warning: could not gather existing tmux sessions:", err)
 		return err
 	}
+
 	sm := session.NewSessionManager(sessions)
 	sh := handler.NewSessionHandler(config, sm, tmux)
+
 	return runWithHandler(sh, ctx, cmd)
 }
 
