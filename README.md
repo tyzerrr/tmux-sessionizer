@@ -29,20 +29,6 @@ tmux-sessionizer list
 ```
 Displays the list of existing tmux-sessions defined and when you hit enter attach the target session.
 
-3. **tmux-sessionizer create**
-```bash
-tmux-sessionizer create
-```
-Displays interactive interface to create new directory and a new associated tmux session.
-
-4. **tmux-sessionizer delete**
-```bash
-tmux-sessionizer delete
-```
-Displays interactive interface to delete existing tmux sessions.
-
-**Don't worry, associated directory is not deleted.**
-
 ## Demo
 
 https://github.com/user-attachments/assets/be1d2732-38ee-41c7-9393-ecc6c0211048
