@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 
 	"github.com/TlexCypher/my-tmux-sessionizer/internal/command"
 	iohelper "github.com/TlexCypher/my-tmux-sessionizer/internal/io"
@@ -46,7 +45,7 @@ func (sh *SessionHandler) NewSession(ctx context.Context) error {
 	// NOTE: if session is not found, create a new one.
 	if err != nil {
 		session := sh.manager.CreateSession(
-			filepath.Base(projectPath),
+			projectPath,
 			projectPath,
 		)
 		if sh.tmux.IsInSession() {
@@ -65,8 +64,8 @@ func (sh *SessionHandler) NewSession(ctx context.Context) error {
 
 func (sh *SessionHandler) GrabExistingSession(ctx context.Context) error {
 	sessions := sh.manager.ListSessions()
-
 	fzfCmd := command.NewFzfCommand(ctx)
+
 	for _, session := range sessions {
 		fzfCmd.InBuf().WriteString(session.Name.Value() + "\n")
 	}

@@ -39,6 +39,7 @@ func (sm *SessionManager) ListSessions() (sessions []*Session) {
 
 func (sm *SessionManager) GetSession(rawPath string) (*Session, error) {
 	projectPath := types.NewString(rawPath)
+
 	if session, exists := sm.sessions[projectPath]; exists {
 		return session, nil
 	}

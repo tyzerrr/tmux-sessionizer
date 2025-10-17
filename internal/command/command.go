@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
 	"os/exec"
 )
 
@@ -56,12 +57,15 @@ type TmuxCommand struct {
 func NewTmuxCommand(ctx context.Context, args ...string) *TmuxCommand {
 	cmd := exec.CommandContext(ctx, "tmux", args...)
 	ob := &bytes.Buffer{}
-	cmd.Stdout = ob
 	/*
 	   When tmux try to attach, real tty is necessary.
 	   But as default, exec.CommandContext provides virtual in-memory pipe.
 	   So tmux throws the error.
 	*/
+	cmd.Stdout = ob
+	cmd.Stdin = os.Stdin
+	cmd.Stderr = os.Stderr
+
 	return &TmuxCommand{
 		Cmd:    cmd,
 		outBuf: ob,
