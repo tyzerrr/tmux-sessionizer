@@ -6,14 +6,27 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 
 	"github.com/TlexCypher/my-tmux-sessionizer/handler"
+	iohelper "github.com/TlexCypher/my-tmux-sessionizer/internal/io"
+	"github.com/TlexCypher/my-tmux-sessionizer/internal/session"
+	"github.com/TlexCypher/my-tmux-sessionizer/internal/tmux"
 	"github.com/urfave/cli/v3"
 )
 
 const (
 	ExitCodeOK        = 0
 	ExitCodeError int = iota
+)
+
+const (
+	configFile = "~/.tmux-sessionizer"
+)
+
+const (
+	CommandName  = "tmux-sessionizer"
+	CommandUsage = "tmux session manager"
 )
 
 var (
@@ -26,6 +39,7 @@ func Core() int {
 
 	cmd := newCmd()
 	if err := cmd.Run(ctx, os.Args); err != nil {
+		fmt.Println(err)
 		return ExitCodeError
 	}
 	return ExitCodeOK
@@ -33,23 +47,36 @@ func Core() int {
 
 func newCmd() *cli.Command {
 	return &cli.Command{
-		Name:   "tmux-sessionizer",
-		Usage:  "tmux session manager",
+		Name:   CommandName,
+		Usage:  CommandUsage,
 		Action: run,
 	}
 }
 
 func run(ctx context.Context, cmd *cli.Command) error {
-	pathResolver := handler.NewPathResolver()
-	config, err := handler.NewConfigParser(pathResolver).ReadConfig()
+	filepathResolver := iohelper.NewFilePathResolver()
+	configFile, err := filepathResolver.ExpandTildeAsHomeDir(configFile)
 	if err != nil {
-		return fmt.Errorf("failed to run tmux-sessionizer because failed to read configration files: %w", err)
+		return err
 	}
-	projectNameFullPathMap, projectExpressionNameMap, err := pathResolver.BuildProjectInfo(config)
+	configParser := iohelper.NewConfigParser()
+	configFileAbs, err := filepath.Abs(configFile)
 	if err != nil {
-		return fmt.Errorf("failed to build project information from .tmux-sessionizer config files: %w", err)
+		return err
 	}
-	sh := handler.NewSessionHandler(config, pathResolver, projectNameFullPathMap, projectExpressionNameMap)
+
+	config, err := configParser.ReadConfig(configFileAbs)
+	if err != nil {
+		return err
+	}
+	tmux := tmux.NewTmux()
+	sessions, err := tmux.GatherExistingSessions()
+	if err != nil {
+		fmt.Println("Warning: could not gather existing tmux sessions:", err)
+		return err
+	}
+	sm := session.NewSessionManager(sessions)
+	sh := handler.NewSessionHandler(config, sm, tmux)
 	return runWithHandler(sh, ctx, cmd)
 }
 
@@ -57,10 +84,6 @@ func runWithHandler(h handler.ISessionHandler, ctx context.Context, cmd *cli.Com
 	args := cmd.Args().Slice()
 	if len(args) > 0 && args[0] == "list" {
 		return h.GrabExistingSession(ctx)
-	} else if len(args) > 0 && args[0] == "create" {
-		return h.CreateNewProjectSession(ctx)
-	} else if len(args) > 0 && args[0] == "delete" {
-		return h.DeleteProjectSession(ctx)
 	} else if len(args) > 0 {
 		return ErrNoSuchCmd
 	} else {
