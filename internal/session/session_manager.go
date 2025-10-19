@@ -2,6 +2,7 @@ package session
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/TlexCypher/my-tmux-sessionizer/internal/types"
 )
@@ -21,7 +22,9 @@ func NewSessionManager(sessions map[types.String]*Session) *SessionManager {
 }
 
 func (sm *SessionManager) CreateSession(rawName string, rawPath string) *Session {
-	name, projectPath := types.NewString(rawName), types.NewString(rawPath)
+	cannonicalized := sm.cannonicalizeSessionName(rawName)
+
+	name, projectPath := types.NewString(cannonicalized), types.NewString(rawPath)
 	if _, exists := sm.sessions[projectPath]; !exists {
 		sm.sessions[projectPath] = NewSession(name, projectPath)
 	}
@@ -45,4 +48,12 @@ func (sm *SessionManager) GetSession(rawPath string) (*Session, error) {
 	}
 
 	return nil, ErrSessionNotFound
+}
+
+// NOTE: tmux does not allow contain ":", ".", they are replaced with "_".
+func (sm *SessionManager) cannonicalizeSessionName(rawName string) string {
+	rp := strings.ReplaceAll(rawName, ":", "_")
+	rp = strings.ReplaceAll(rp, ".", "_")
+
+	return rp
 }
