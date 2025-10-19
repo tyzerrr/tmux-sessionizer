@@ -40,13 +40,13 @@ func (sh *SessionHandler) NewSession(ctx context.Context) error {
 		return fmt.Errorf("failed to grab project path with fzf: %w", err)
 	}
 
-	projectPath := fzfCmd.OutBuf().String()
-	session, err := sh.manager.GetSession(projectPath)
+	rawPath := fzfCmd.OutBuf().String()
+	session, err := sh.manager.GetSession(rawPath)
 	// NOTE: if session is not found, create a new one.
 	if err != nil {
 		session := sh.manager.CreateSession(
-			projectPath,
-			projectPath,
+			rawPath,
+			rawPath,
 		)
 		if sh.tmux.IsInSession() {
 			return sh.tmux.SwitchToNewClient(ctx, session)
@@ -67,7 +67,7 @@ func (sh *SessionHandler) GrabExistingSession(ctx context.Context) error {
 	fzfCmd := command.NewFzfCommand(ctx)
 
 	for _, session := range sessions {
-		fzfCmd.InBuf().WriteString(session.Name.Value() + "\n")
+		fzfCmd.InBuf().WriteString(session.ProjectPath.Value() + "\n")
 	}
 
 	if err := fzfCmd.Run(); err != nil {
