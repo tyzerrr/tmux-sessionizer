@@ -12,8 +12,6 @@ import (
 func TestSessionManager_CreateSession(t *testing.T) {
 	t.Parallel()
 
-	sm := NewSessionManager(make(map[types.String]*Session))
-
 	tests := []struct {
 		name        string
 		sessionName string
@@ -22,17 +20,28 @@ func TestSessionManager_CreateSession(t *testing.T) {
 	}{
 		{
 			name:        "Create new session even for including newline characters",
-			sessionName: "project1\n",
+			sessionName: "/path/to/project1\n",
 			path:        "/path/to/project1\n",
 			want: &Session{
-				Name:        types.NewString("project1"),
+				Name:        types.NewString("/path/to/project1"),
 				ProjectPath: types.NewString("/path/to/project1"),
+			},
+		},
+		{
+			name:        "Create new session with dot in name",
+			sessionName: "/path/to/.config/tmux-sessionizer\n",
+			path:        "/path/to/.config/tmux-sessionizer\n",
+			want: &Session{
+				Name:        types.NewString("/path/to/_config/tmux-sessionizer"),
+				ProjectPath: types.NewString("/path/to/.config/tmux-sessionizer"),
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
+			sm := NewSessionManager(make(map[types.String]*Session))
 
 			got := sm.CreateSession(tt.sessionName, tt.path)
 			if diff := cmp.Diff(tt.want, got, []cmp.Option{
@@ -141,6 +150,40 @@ func TestSessionManager_ListSessions(t *testing.T) {
 				}),
 			}...); diff != "" {
 				t.Errorf("ListSessions() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestSessionManager_cannonicalizeSessionName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		rawName string
+		want    string
+	}{
+		{
+			name:    "Replace dot to underscore",
+			rawName: "/path/to/.config/tmux-sesionizer",
+			want:    "/path/to/_config/tmux-sesionizer",
+		},
+		{
+			name:    "Replace colon to underscore",
+			rawName: "/path/to/project:session",
+			want:    "/path/to/project_session",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			sm := NewSessionManager(make(map[types.String]*Session))
+
+			got := sm.cannonicalizeSessionName(tt.rawName)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("cannonicalizeSessionName() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
