@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 
 	"github.com/TlexCypher/my-tmux-sessionizer/handler"
 	iohelper "github.com/TlexCypher/my-tmux-sessionizer/internal/io"
@@ -89,7 +90,18 @@ func run(ctx context.Context, cmd *cli.Command) error {
 		sessions = make(map[types.String]*session.Session, 0)
 	}
 
-	sm := session.NewSessionManager(sessions)
+	sessionNameTransformer := session.NewTransformer().WithRule(
+		session.NewTransformRule(
+			func(in string) string { return strings.ReplaceAll(in, ".", "_") },
+			func(in string) string { return strings.ReplaceAll(in, "_", ".") },
+		),
+		session.NewTransformRule(
+			func(in string) string { return strings.ReplaceAll(in, ":", ";") },
+			func(in string) string { return strings.ReplaceAll(in, ";", ":") },
+		),
+	)
+
+	sm := session.NewSessionManager(sessions, sessionNameTransformer)
 	sh := handler.NewSessionHandler(config, sm, tmux)
 
 	return runWithHandler(sh, ctx, cmd)

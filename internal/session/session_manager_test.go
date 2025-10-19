@@ -3,6 +3,7 @@ package session
 import (
 	"errors"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/TlexCypher/my-tmux-sessionizer/internal/types"
@@ -41,7 +42,18 @@ func TestSessionManager_CreateSession(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			sm := NewSessionManager(make(map[types.String]*Session))
+			sessionNameTransformer := NewTransformer().WithRule(
+				NewTransformRule(
+					func(in string) string { return strings.ReplaceAll(in, ".", "_") },
+					func(in string) string { return strings.ReplaceAll(in, "_", ".") },
+				),
+				NewTransformRule(
+					func(in string) string { return strings.ReplaceAll(in, ":", ";") },
+					func(in string) string { return strings.ReplaceAll(in, ";", ":") },
+				),
+			)
+
+			sm := NewSessionManager(make(map[types.String]*Session), sessionNameTransformer)
 
 			got := sm.CreateSession(tt.sessionName, tt.path)
 			if diff := cmp.Diff(tt.want, got, []cmp.Option{
@@ -59,10 +71,19 @@ func TestSesssionManager_GetSession(t *testing.T) {
 	t.Parallel()
 
 	session1 := &Session{Name: types.NewString("project1"), ProjectPath: types.NewString("/path/to/project1")}
-
+	sessionNameTransformer := NewTransformer().WithRule(
+		NewTransformRule(
+			func(in string) string { return strings.ReplaceAll(in, ".", "_") },
+			func(in string) string { return strings.ReplaceAll(in, "_", ".") },
+		),
+		NewTransformRule(
+			func(in string) string { return strings.ReplaceAll(in, ":", ";") },
+			func(in string) string { return strings.ReplaceAll(in, ";", ":") },
+		),
+	)
 	sm := NewSessionManager(map[types.String]*Session{
 		types.NewString("/path/to/project1"): session1,
-	})
+	}, sessionNameTransformer)
 
 	tests := []struct {
 		name    string
@@ -115,11 +136,21 @@ func TestSessionManager_ListSessions(t *testing.T) {
 	session2 := &Session{Name: types.NewString("project2"), ProjectPath: types.NewString("/path/to/project2")}
 	session3 := &Session{Name: types.NewString("project3"), ProjectPath: types.NewString("/path/to/project3")}
 
+	sessionNameTransformer := NewTransformer().WithRule(
+		NewTransformRule(
+			func(in string) string { return strings.ReplaceAll(in, ".", "_") },
+			func(in string) string { return strings.ReplaceAll(in, "_", ".") },
+		),
+		NewTransformRule(
+			func(in string) string { return strings.ReplaceAll(in, ":", ";") },
+			func(in string) string { return strings.ReplaceAll(in, ";", ":") },
+		),
+	)
 	sm := NewSessionManager(map[types.String]*Session{
 		types.NewString("/path/to/project1"): session1,
 		types.NewString("/path/to/project2"): session2,
 		types.NewString("/path/to/project3"): session3,
-	})
+	}, sessionNameTransformer)
 
 	tests := []struct {
 		name string
@@ -150,40 +181,6 @@ func TestSessionManager_ListSessions(t *testing.T) {
 				}),
 			}...); diff != "" {
 				t.Errorf("ListSessions() mismatch (-want +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestSessionManager_cannonicalizeSessionName(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		rawName string
-		want    string
-	}{
-		{
-			name:    "Replace dot to underscore",
-			rawName: "/path/to/.config/tmux-sesionizer",
-			want:    "/path/to/_config/tmux-sesionizer",
-		},
-		{
-			name:    "Replace colon to underscore",
-			rawName: "/path/to/project:session",
-			want:    "/path/to/project_session",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			sm := NewSessionManager(make(map[types.String]*Session))
-
-			got := sm.cannonicalizeSessionName(tt.rawName)
-			if diff := cmp.Diff(tt.want, got); diff != "" {
-				t.Errorf("cannonicalizeSessionName() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
