@@ -53,6 +53,7 @@ func Test_ConfigParser_parse(t *testing.T) {
 			},
 			want: &Config{
 				Projects: []types.String{
+					types.NewString("/tmp/tmuxsessionizer/projects\n"),
 					types.NewString("/tmp/tmuxsessionizer/projects/project1\n"),
 					types.NewString("/tmp/tmuxsessionizer/projects/project2\n"),
 					types.NewString("/tmp/tmuxsessionizer/projects/project3\n"),
