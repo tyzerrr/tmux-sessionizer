@@ -75,10 +75,12 @@ func (c *ConfigParser) parse(projectList []string) (*Config, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		if err := c.createProjects(config, absPath); err != nil && errors.Is(err, filepath.SkipDir) {
 			return nil, err
 		}
 	}
+
 	return config, nil
 }
 
@@ -88,14 +90,18 @@ func (c *ConfigParser) createProjects(config *Config, root string) error {
 			if os.IsPermission(err) {
 				return nil
 			}
+
 			return err
 		}
+
 		if d.IsDir() {
 			if strings.HasPrefix(d.Name(), ".") && path != root {
 				return filepath.SkipDir
 			}
+
 			config.Projects = append(config.Projects, types.NewString(path))
 		}
+
 		return nil
 	})
 }
