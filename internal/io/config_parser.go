@@ -2,6 +2,8 @@ package io
 
 import (
 	"bufio"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -73,20 +75,27 @@ func (c *ConfigParser) parse(projectList []string) (*Config, error) {
 		if err != nil {
 			return nil, err
 		}
-
-		files, err := os.ReadDir(absPath)
-		if err != nil {
+		if err := c.createProjects(config, absPath); err != nil && errors.Is(err, filepath.SkipDir) {
 			return nil, err
 		}
-
-		for _, f := range files {
-			if !f.IsDir() {
-				continue
-			}
-
-			config.Projects = append(config.Projects, types.NewString(filepath.Join(absPath, f.Name())))
-		}
 	}
-
 	return config, nil
+}
+
+func (c *ConfigParser) createProjects(config *Config, root string) error {
+	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			if os.IsPermission(err) {
+				return nil
+			}
+			return err
+		}
+		if d.IsDir() {
+			if strings.HasPrefix(d.Name(), ".") && path != root {
+				return filepath.SkipDir
+			}
+			config.Projects = append(config.Projects, types.NewString(path))
+		}
+		return nil
+	})
 }
