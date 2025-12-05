@@ -22,6 +22,8 @@ builds:
       - linux
       - windows
       - darwin
+    ldflags:
+      - -s -w -X main.version={{.Version}}
 
 archives:
   - formats: [tar.gz]
@@ -65,4 +67,3 @@ brews:
       bin.install "tmux-sessionizer"
     test: |
       system "#{bin}/tmux-sessionizer", "--version"
-
