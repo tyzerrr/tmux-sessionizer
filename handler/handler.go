@@ -3,16 +3,19 @@ package handler
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/TlexCypher/my-tmux-sessionizer/internal/command"
 	iohelper "github.com/TlexCypher/my-tmux-sessionizer/internal/io"
 	"github.com/TlexCypher/my-tmux-sessionizer/internal/session"
 	"github.com/TlexCypher/my-tmux-sessionizer/internal/tmux"
+	"golang.org/x/sync/errgroup"
 )
 
 type ISessionHandler interface {
 	NewSession(ctx context.Context) error
 	GrabExistingSession(ctx context.Context) error
+	DeleteSession(ctx context.Context) error
 }
 
 type SessionHandler struct {
@@ -86,4 +89,35 @@ func (sh *SessionHandler) GrabExistingSession(ctx context.Context) error {
 	}
 
 	return sh.tmux.Attach(ctx, session)
+}
+
+func (sh *SessionHandler) DeleteSession(ctx context.Context) error {
+	sessions := sh.manager.ListSessions()
+	fzfCmd := command.NewFzfCommand(ctx, "-m")
+
+	for _, session := range sessions {
+		fzfCmd.InBuf().WriteString(session.ProjectPath.Value() + "\n")
+	}
+
+	if err := fzfCmd.Run(); err != nil {
+		return err
+	}
+
+	deletes := fzfCmd.OutBuf().String()
+	// split all with "\n"
+	ds := strings.Split(strings.TrimSuffix(deletes, "\n"), "\n")
+	filtered := sh.manager.FilterSessions(ds)
+	if err := sh.manager.DeleteSessions(ds); err != nil {
+		return err
+	}
+	eg := new(errgroup.Group)
+	for _, f := range filtered {
+		eg.Go(func() error {
+			if err := sh.tmux.Delete(ctx, f); err != nil {
+				return err
+			}
+			return nil
+		})
+	}
+	return eg.Wait()
 }
