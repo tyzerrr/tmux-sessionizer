@@ -94,12 +94,23 @@ func (c *ConfigParser) createProjects(config *Config, root string) error {
 			return err
 		}
 
+		hasGit := false
 		if d.IsDir() {
+			entries, err := os.ReadDir(path)
+			if err != nil {
+				return err
+			}
+			for _, e := range entries {
+				if e.IsDir() && e.Name() == ".git" {
+					hasGit = true
+				}
+			}
 			if strings.HasPrefix(d.Name(), ".") && path != root {
 				return filepath.SkipDir
 			}
-
-			config.Projects = append(config.Projects, types.NewString(path))
+			if hasGit {
+				config.Projects = append(config.Projects, types.NewString(path))
+			}
 		}
 
 		return nil
