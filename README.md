@@ -12,7 +12,7 @@ And this project is inspired https://github.com/theprimeagen/tmux-sessionizer.
 Thank you, ThePrimeagen.
 
 ## Usage
-**tmux-sessionizer** provides four commands.
+**tmux-sessionizer** provides three commands.
 1. **tmux-sessionizer**
 
 ```bash
@@ -27,7 +27,15 @@ Once selected, tmux-sessionizer will either attach to the existing tmux session 
 ```bash
 tmux-sessionizer list
 ```
-Displays the list of existing tmux-sessions defined and when you hit enter attach the target session.
+Displays the list of existing tmux-sessions and when you hit enter attaches the target session.
+
+3. **tmux-sessionizer delete**
+```bash
+tmux-sessionizer delete
+```
+Displays the list of existing tmux-sessions using fzf and lets you delete them.
+
+Selection is multi-select (`-m`): use `Tab` to mark multiple sessions, then hit enter to delete all of the selected sessions at once.
 
 ## Demo
 
@@ -45,6 +53,11 @@ To specify which directories should be searched, you need to create a configurat
 This file can be created per project.
 
 When reading configuration files, the one in the current directory takes precedence over the one in your home directory.
+
+### Recursive project search
+Each directory listed in the config is searched **recursively**, and any directory that contains a `.git` directory is treated as a project and shown in fzf.
+
+This means you only need to list a few parent directories (for example `~/projects`), and every git repository nested under them is discovered automatically. Hidden directories (those starting with `.`) are skipped, so you won't see paths inside `.git` and similar directories.
 
 ## Installation
 You can install with homebrew.
