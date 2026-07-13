@@ -111,6 +111,8 @@ func runWithHandler(h handler.ISessionHandler, ctx context.Context, cmd *cli.Com
 	args := cmd.Args().Slice()
 	if len(args) > 0 && args[0] == "list" {
 		return h.GrabExistingSession(ctx)
+	} else if len(args) > 0 && args[0] == "delete" {
+		return h.DeleteSession(ctx)
 	} else if len(args) > 0 {
 		return ErrNoSuchCmd
 	} else {
