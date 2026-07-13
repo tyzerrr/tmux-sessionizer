@@ -56,10 +56,10 @@ release:
 
 brews:
   - name: tmux-sessionizer
-    homepage: "https://github.com/TlexCypher/tmux-sessionizer"
+    homepage: "https://github.com/tyzerrr/tmux-sessionizer"
     description: "Tmux session manager with fzf"
     repository:
-      owner: TlexCypher
+      owner: tyzerrr
       name: homebrew-tap
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     directory: Formula
