@@ -37,10 +37,6 @@ func (mh *MockSessionHandler) GrabExistingSession(ctx context.Context) error {
 	return nil
 }
 
-func (mh *MockSessionHandler) CreateNewProjectSession(ctx context.Context) error {
-	return nil
-}
-
 func (mh *MockSessionHandler) DeleteSessions(ctx context.Context) error {
 	return nil
 }
