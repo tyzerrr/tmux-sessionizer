@@ -19,8 +19,8 @@ type FzfCommand struct {
 	outBuf *bytes.Buffer
 }
 
-func NewFzfCommand(ctx context.Context) *FzfCommand {
-	cmd := exec.CommandContext(ctx, "fzf")
+func NewFzfCommand(ctx context.Context, opts ...string) *FzfCommand {
+	cmd := exec.CommandContext(ctx, "fzf", opts...)
 	inBuf, outBuf := &bytes.Buffer{}, &bytes.Buffer{}
 	cmd.Stdin, cmd.Stdout = inBuf, outBuf
 
