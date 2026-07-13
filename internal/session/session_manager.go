@@ -2,10 +2,8 @@ package session
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/TlexCypher/my-tmux-sessionizer/internal/types"
-	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -67,24 +65,25 @@ func (sm *SessionManager) GetSession(rawPath string) (*Session, error) {
 	return nil, ErrSessionNotFound
 }
 
+// DeleteSessions removes every session identified by rawPaths. Deletion runs
+// sequentially because the underlying map is not safe for concurrent writes.
+func (sm *SessionManager) DeleteSessions(rawPaths []string) error {
+	for _, path := range rawPaths {
+		if err := sm.deleteSession(path); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (sm *SessionManager) deleteSession(rawPath string) error {
 	projectPath := types.NewString(rawPath)
 	if _, exists := sm.sessions[projectPath]; !exists {
 		return ErrSessionNotFound
 	}
-	delete(sm.sessions, projectPath)
-	return nil
-}
 
-func (sm *SessionManager) DeleteSessions(rawPaths []string) error {
-	var eg errgroup.Group
-	for _, path := range rawPaths {
-		eg.Go(func() error {
-			if err := sm.deleteSession(path); err != nil {
-				return err
-			}
-			return nil
-		})
-	}
+	delete(sm.sessions, projectPath)
+
 	return nil
 }

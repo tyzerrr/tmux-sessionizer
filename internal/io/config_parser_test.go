@@ -3,6 +3,7 @@ package io
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/TlexCypher/my-tmux-sessionizer/internal/types"
@@ -26,8 +27,10 @@ func setupHomeEnv() {
 func (s *testContainer) setup() {
 	setupHomeEnv()
 
+	// createProjects only collects directories that contain a ".git" child,
+	// so each expected project directory is set up as a git repository.
 	for _, p := range s.dirs {
-		_ = os.MkdirAll(p.Value(), 0755)
+		_ = os.MkdirAll(filepath.Join(p.Value(), ".git"), 0755)
 	}
 }
 
@@ -53,10 +56,9 @@ func Test_ConfigParser_parse(t *testing.T) {
 			},
 			want: &Config{
 				Projects: []types.String{
-					types.NewString("/tmp/tmuxsessionizer/projects\n"),
-					types.NewString("/tmp/tmuxsessionizer/projects/project1\n"),
-					types.NewString("/tmp/tmuxsessionizer/projects/project2\n"),
-					types.NewString("/tmp/tmuxsessionizer/projects/project3\n"),
+					types.NewString("/tmp/tmuxsessionizer/projects/project1"),
+					types.NewString("/tmp/tmuxsessionizer/projects/project2"),
+					types.NewString("/tmp/tmuxsessionizer/projects/project3"),
 				},
 			},
 			wantErr: nil,

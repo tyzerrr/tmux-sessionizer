@@ -41,7 +41,7 @@ func (mh *MockSessionHandler) CreateNewProjectSession(ctx context.Context) error
 	return nil
 }
 
-func (mh *MockSessionHandler) DeleteProjectSession(ctx context.Context) error {
+func (mh *MockSessionHandler) DeleteSessions(ctx context.Context) error {
 	return nil
 }
 

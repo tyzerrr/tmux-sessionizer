@@ -15,7 +15,7 @@ import (
 type ISessionHandler interface {
 	NewSession(ctx context.Context) error
 	GrabExistingSession(ctx context.Context) error
-	DeleteSession(ctx context.Context) error
+	DeleteSessions(ctx context.Context) error
 }
 
 type SessionHandler struct {
@@ -91,7 +91,7 @@ func (sh *SessionHandler) GrabExistingSession(ctx context.Context) error {
 	return sh.tmux.Attach(ctx, session)
 }
 
-func (sh *SessionHandler) DeleteSession(ctx context.Context) error {
+func (sh *SessionHandler) DeleteSessions(ctx context.Context) error {
 	sessions := sh.manager.ListSessions()
 	fzfCmd := command.NewFzfCommand(ctx, "-m")
 

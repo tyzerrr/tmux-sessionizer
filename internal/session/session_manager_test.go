@@ -67,6 +67,90 @@ func TestSessionManager_CreateSession(t *testing.T) {
 	}
 }
 
+func TestSessionManager_DeleteSessions(t *testing.T) {
+	t.Parallel()
+
+	const (
+		path1 = "/path/to/project1"
+		path2 = "/path/to/project2"
+		path3 = "/path/to/project3"
+	)
+
+	newManager := func() *SessionManager {
+		transformer := NewTransformer().WithRule(
+			NewTransformRule(
+				func(in string) string { return strings.ReplaceAll(in, ".", "_") },
+				func(in string) string { return strings.ReplaceAll(in, "_", ".") },
+			),
+		)
+
+		return NewSessionManager(map[types.String]*Session{
+			types.NewString(path1): {Name: types.NewString("project1"), ProjectPath: types.NewString(path1)},
+			types.NewString(path2): {Name: types.NewString("project2"), ProjectPath: types.NewString(path2)},
+			types.NewString(path3): {Name: types.NewString("project3"), ProjectPath: types.NewString(path3)},
+		}, transformer)
+	}
+
+	tests := []struct {
+		name     string
+		delete   []string
+		wantErr  error
+		wantLeft []string
+	}{
+		{
+			name:     "delete a single session",
+			delete:   []string{path1},
+			wantErr:  nil,
+			wantLeft: []string{path2, path3},
+		},
+		{
+			name:     "delete multiple sessions at once",
+			delete:   []string{path1, path3},
+			wantErr:  nil,
+			wantLeft: []string{path2},
+		},
+		{
+			name:     "delete every session",
+			delete:   []string{path1, path2, path3},
+			wantErr:  nil,
+			wantLeft: []string{},
+		},
+		{
+			name:     "delete non-existing session returns ErrSessionNotFound",
+			delete:   []string{"/path/to/nonexistent"},
+			wantErr:  ErrSessionNotFound,
+			wantLeft: []string{path1, path2, path3},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			sm := newManager()
+
+			err := sm.DeleteSessions(tt.delete)
+			if !errors.Is(err, tt.wantErr) {
+				t.Errorf("DeleteSessions() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			got := make([]string, 0, len(sm.sessions))
+			for _, s := range sm.ListSessions() {
+				got = append(got, s.ProjectPath.Value())
+			}
+
+			sort.Strings(got)
+
+			want := append([]string{}, tt.wantLeft...)
+			sort.Strings(want)
+
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("remaining sessions mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestSesssionManager_GetSession(t *testing.T) {
 	t.Parallel()
 
