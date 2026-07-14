@@ -12,7 +12,7 @@ And this project is inspired https://github.com/theprimeagen/tmux-sessionizer.
 Thank you, ThePrimeagen.
 
 ## Usage
-**tmux-sessionizer** provides three commands.
+**tmux-sessionizer** provides five commands.
 1. **tmux-sessionizer**
 
 ```bash
@@ -37,6 +37,18 @@ Displays the list of existing tmux-sessions using fzf and lets you delete them.
 
 Selection is multi-select (`-m`): use `Tab` to mark multiple sessions, then hit enter to delete all of the selected sessions at once.
 
+4. **tmux-sessionizer init**
+```bash
+tmux-sessionizer init
+```
+Creates the .tmux-sessionizer config file with the required `default=` prefix. If the config file already exists, it does nothing.
+
+5. **tmux-sessionizer register**
+```bash
+tmux-sessionizer register <path/to/project>
+```
+Registers a directory as a project by appending it to the config file. The path is resolved to an absolute path before it is stored, so relative paths are safe to use.
+
 ## Demo
 
 https://github.com/user-attachments/assets/be1d2732-38ee-41c7-9393-ecc6c0211048
@@ -49,15 +61,12 @@ default=~/personal, ~/projects, ./ # comma separated, both absolute/relative are
 
 tmux-sessionizer searches directories and displays them using fzf, but it does not search all directories.
 
-To specify which directories should be searched, you need to create a configuration file called .tmux-sessionizer.
-This file can be created per project.
+To specify which directories should be searched, you need to create a configuration file called .tmux-sessionizer in your home directory.
 
-When reading configuration files, the one in the current directory takes precedence over the one in your home directory.
+### Projects
+Each path listed in the config is treated as a single project and shown in fzf as-is. Directories are **not** searched recursively — list every project directory explicitly.
 
-### Recursive project search
-Each directory listed in the config is searched **recursively**, and any directory that contains a `.git` directory is treated as a project and shown in fzf.
-
-This means you only need to list a few parent directories (for example `~/projects`), and every git repository nested under them is discovered automatically. Hidden directories (those starting with `.`) are skipped, so you won't see paths inside `.git` and similar directories.
+To add a project, either edit the config file directly or run `tmux-sessionizer register <path/to/project>`.
 
 ## Installation
 You can install with homebrew.
