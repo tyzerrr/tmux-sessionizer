@@ -14,6 +14,7 @@ import (
 	"github.com/TlexCypher/my-tmux-sessionizer/internal/session"
 	"github.com/TlexCypher/my-tmux-sessionizer/internal/tmux"
 	"github.com/TlexCypher/my-tmux-sessionizer/internal/types"
+	"github.com/TlexCypher/my-tmux-sessionizer/internal/validate"
 	"github.com/urfave/cli/v3"
 )
 
@@ -59,34 +60,57 @@ func newCmd() *cli.Command {
 }
 
 func run(ctx context.Context, cmd *cli.Command) error {
-	filepathResolver := iohelper.NewFilePathResolver()
-
-	configFile, err := filepathResolver.ExpandTildeAsHomeDir(configFile)
+	filer := iohelper.NewFiler()
+	configFile, err := filer.ExpandTildeAsHomeDir(configFile)
 	if err != nil {
 		return err
 	}
-
-	configParser := iohelper.NewConfigParser()
-
 	configFileAbs, err := filepath.Abs(configFile)
 	if err != nil {
 		return err
 	}
 
-	config, err := configParser.ReadConfig(configFileAbs)
+	return runWithHandler(ctx, cmd, filer, configFileAbs)
+}
+
+func runWithHandler(
+	ctx context.Context,
+	cmd *cli.Command,
+	filer *iohelper.Filer,
+	configFileAbs string,
+) error {
+	args := cmd.Args().Slice()
+	// initialization does not need config file validation
+	ph := handler.NewProjectHandler(configFileAbs)
+	if len(args) == 1 && args[0] == "init" {
+		return ph.Init(ctx, configFileAbs)
+	}
+	config, err := readConfig(ctx, filer, configFileAbs)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read config:%w", err)
+	}
+	// register does not require to gather tmux sessions
+	if len(args) == 2 && args[0] == "register" {
+		return registerProject(ctx, ph, filer, config, args[1])
 	}
 
-	tmux := tmux.NewTmux()
+	sh := buildSessionHandler(ctx, config)
+	if len(args) == 1 && args[0] == "list" {
+		return sh.GrabExistingSession(ctx)
+	} else if len(args) == 1 && args[0] == "delete" {
+		return sh.DeleteSessions(ctx)
+	} else if len(args) > 0 {
+		return ErrNoSuchCmd
+	} else {
+		return sh.NewSession(ctx)
+	}
+}
 
+func buildSessionHandler(ctx context.Context, config *iohelper.Config) handler.ISessionHandler {
+	tmux := tmux.NewTmux()
 	sessions, err := tmux.GatherExistingSessions(ctx)
 	if err != nil {
-		if sessions != nil {
-			fmt.Println("could not gather existing tmux sessions even for tmux has started:", err)
-			return err
-		}
-
+		// tmux may simply not be running yet; start from an empty session map.
 		sessions = make(map[types.String]*session.Session, 0)
 	}
 
@@ -100,22 +124,52 @@ func run(ctx context.Context, cmd *cli.Command) error {
 			func(in string) string { return strings.ReplaceAll(in, ";", ":") },
 		),
 	)
-
 	sm := session.NewSessionManager(sessions, sessionNameTransformer)
-	sh := handler.NewSessionHandler(config, sm, tmux)
-
-	return runWithHandler(sh, ctx, cmd)
+	return handler.NewSessionHandler(config, sm, tmux)
 }
 
-func runWithHandler(h handler.ISessionHandler, ctx context.Context, cmd *cli.Command) error {
-	args := cmd.Args().Slice()
-	if len(args) > 0 && args[0] == "list" {
-		return h.GrabExistingSession(ctx)
-	} else if len(args) > 0 && args[0] == "delete" {
-		return h.DeleteSessions(ctx)
-	} else if len(args) > 0 {
-		return ErrNoSuchCmd
-	} else {
-		return h.NewSession(ctx)
+func readConfig(_ context.Context, filer *iohelper.Filer, configFileAbs string) (*iohelper.Config, error) {
+	if err := validate.ValidateConfig(configFileAbs); err != nil {
+		return nil, fmt.Errorf("failed to validate config file:%w", err)
 	}
+
+	configParser := iohelper.NewConfigParser()
+	config, err := configParser.ReadConfig(filer, configFileAbs)
+	if err != nil {
+		return nil, err
+	}
+	return config, nil
+}
+
+func registerProject(
+	ctx context.Context,
+	ph *handler.ProjectHandler,
+	filer *iohelper.Filer,
+	config *iohelper.Config,
+	rawPath string,
+) error {
+	registerPath, err := filer.ExpandTildeAsHomeDir(rawPath)
+	if err != nil {
+		return fmt.Errorf("failed to register %s as a tmux-sessionizer project:%w", rawPath, err)
+	}
+	// Tilde expansion alone keeps plain relative paths relative;
+	// Register requires an absolute path so it never depends on a later CWD.
+	registerAbs, err := filepath.Abs(registerPath)
+	if err != nil {
+		return fmt.Errorf("failed to convert %s to absolute path:%w", registerPath, err)
+	}
+
+	// A comma is the config entry separator and cannot be escaped, so a
+	// path containing one would split into bogus entries on the next read.
+	if strings.Contains(registerAbs, ",") {
+		return fmt.Errorf("project path %s must not contain ',', the config file separator", registerAbs)
+	}
+
+	register := types.NewString(registerAbs)
+	for _, project := range config.Projects {
+		if register.Value() == project.Value() {
+			return errors.New("tmux-sessionizer does not allow duplicated project registration")
+		}
+	}
+	return ph.Register(ctx, registerAbs)
 }

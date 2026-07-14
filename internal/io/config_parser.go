@@ -2,8 +2,6 @@ package io
 
 import (
 	"bufio"
-	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,7 +10,7 @@ import (
 )
 
 const (
-	configPrefix = "default="
+	ConfigPrefix = "default="
 )
 
 type Config struct {
@@ -31,22 +29,23 @@ func NewConfigParser() *ConfigParser {
 	return &ConfigParser{}
 }
 
-func (c *ConfigParser) ReadConfig(configFile string) (*Config, error) {
-	f, err := os.Open(configFile)
+func (c *ConfigParser) ReadConfig(filer *Filer, configFileAbs string) (*Config, error) {
+	f, err := os.Open(configFileAbs)
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 
 	scanner := bufio.NewScanner(f)
 	projectList := []string{}
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		if !strings.HasPrefix(line, configPrefix) {
+		if !strings.HasPrefix(line, ConfigPrefix) {
 			continue
 		}
 
-		seq := strings.Split(strings.TrimPrefix(line, configPrefix), ",")
+		seq := strings.Split(strings.TrimPrefix(line, ConfigPrefix), ",")
 		projectList = append(projectList, seq...)
 	}
 
@@ -54,11 +53,11 @@ func (c *ConfigParser) ReadConfig(configFile string) (*Config, error) {
 		return nil, err
 	}
 
-	return c.parse(projectList)
+	return c.parse(projectList, filer)
 }
 
-func (c *ConfigParser) parse(projectList []string) (*Config, error) {
-	config, filepathResolver := newConfig(), NewFilePathResolver()
+func (c *ConfigParser) parse(projectList []string, filer *Filer) (*Config, error) {
+	config := newConfig()
 
 	for _, p := range projectList {
 		tp := strings.TrimSpace(p)
@@ -66,7 +65,7 @@ func (c *ConfigParser) parse(projectList []string) (*Config, error) {
 			continue
 		}
 
-		tp, err := filepathResolver.ExpandTildeAsHomeDir(tp)
+		tp, err := filer.ExpandTildeAsHomeDir(tp)
 		if err != nil {
 			return nil, err
 		}
@@ -76,43 +75,16 @@ func (c *ConfigParser) parse(projectList []string) (*Config, error) {
 			return nil, err
 		}
 
-		if err := c.createProjects(config, absPath); err != nil && errors.Is(err, filepath.SkipDir) {
-			return nil, err
+		if err := filer.Exists(absPath); err != nil {
+			// NOTE: registered directory might be deleted, we need to skip in this case.
+			continue
 		}
+		c.createProjects(config, absPath)
 	}
 
 	return config, nil
 }
 
-func (c *ConfigParser) createProjects(config *Config, root string) error {
-	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			if os.IsPermission(err) {
-				return nil
-			}
-
-			return err
-		}
-
-		hasGit := false
-		if d.IsDir() {
-			entries, err := os.ReadDir(path)
-			if err != nil {
-				return err
-			}
-			for _, e := range entries {
-				if e.IsDir() && e.Name() == ".git" {
-					hasGit = true
-				}
-			}
-			if strings.HasPrefix(d.Name(), ".") && path != root {
-				return filepath.SkipDir
-			}
-			if hasGit {
-				config.Projects = append(config.Projects, types.NewString(path))
-			}
-		}
-
-		return nil
-	})
+func (c *ConfigParser) createProjects(config *Config, path string) {
+	config.Projects = append(config.Projects, types.NewString(path))
 }

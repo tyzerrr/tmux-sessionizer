@@ -17,6 +17,18 @@ func Test_ConfigParser_parse(t *testing.T) {
 	setupHomeEnv()
 	t.Parallel()
 
+	// parse skips entries whose directory does not exist, so create every
+	// directory the cases expect and guarantee the "ghost" one is absent —
+	// otherwise the results would depend on leftovers in /tmp.
+	for _, dir := range []string{"/tmp/tmuxsessionizer/projects", "/tmp/tmuxsessionizer/personal"} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.RemoveAll("/tmp/tmuxsessionizer/ghost"); err != nil {
+		t.Fatal(err)
+	}
+
 	tests := []struct {
 		name        string
 		projectList []string
@@ -50,6 +62,19 @@ func Test_ConfigParser_parse(t *testing.T) {
 			},
 			wantErr: nil,
 		},
+		{
+			name: "entries whose directory does not exist are skipped",
+			projectList: []string{
+				"~/ghost",
+				"~/projects",
+			},
+			want: &Config{
+				Projects: []types.String{
+					types.NewString("/tmp/tmuxsessionizer/projects"),
+				},
+			},
+			wantErr: nil,
+		},
 	}
 
 	for _, tt := range tests {
@@ -57,7 +82,7 @@ func Test_ConfigParser_parse(t *testing.T) {
 			t.Parallel()
 
 			cp := NewConfigParser()
-			got, err := cp.parse(tt.projectList)
+			got, err := cp.parse(tt.projectList, NewFiler())
 
 			if diff := cmp.Diff(tt.want.Projects, got.Projects, []cmp.Option{
 				cmp.Comparer(func(a, b types.String) bool {

@@ -4,116 +4,201 @@ import (
 	"context"
 	"errors"
 	"os"
-	"sync"
+	"path/filepath"
 	"testing"
 
-	"github.com/TlexCypher/my-tmux-sessionizer/handler"
 	iohelper "github.com/TlexCypher/my-tmux-sessionizer/internal/io"
 	"github.com/urfave/cli/v3"
 )
 
-func newMockCmd() *cli.Command {
-	return &cli.Command{
-		Name:   "mock tmux-sessionizer",
-		Usage:  "mock tmux session manager",
-		Action: mockRun,
+// runTestCmd drives runWithHandler through a real cli.Command with a
+// temporary config file, so tests exercise the actual dispatch logic
+// without touching the user's config.
+func runTestCmd(t *testing.T, configFileAbs string, args ...string) error {
+	t.Helper()
+
+	cmd := &cli.Command{
+		Name:  "mock tmux-sessionizer",
+		Usage: "mock tmux session manager",
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			return runWithHandler(ctx, cmd, iohelper.NewFiler(), configFileAbs)
+		},
 	}
+
+	return cmd.Run(t.Context(), append([]string{"tmux-sessionizer"}, args...))
 }
 
-func mockRun(ctx context.Context, cmd *cli.Command) error {
-	// runWithHandler validates the config file before dispatching,
-	// so even mocked runs need a real, initialized config file.
-	f, err := os.CreateTemp("", "tmux-sessionizer-config")
+func writeConfigFile(t *testing.T, content string) string {
+	t.Helper()
+
+	configFileAbs := filepath.Join(t.TempDir(), ".tmux-sessionizer")
+	if err := os.WriteFile(configFileAbs, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return configFileAbs
+}
+
+func readConfigFile(t *testing.T, configFileAbs string) string {
+	t.Helper()
+
+	b, err := os.ReadFile(configFileAbs)
 	if err != nil {
-		return err
+		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	defer f.Close()
-
-	if _, err := f.WriteString(iohelper.ConfigPrefix); err != nil {
-		return err
-	}
-
-	mh := newMockSessionHandler()
-	ph := handler.NewProjectHandler(f.Name())
-	return runWithHandler(ctx, mh, ph, cmd, f.Name())
+	return string(b)
 }
 
-type MockSessionHandler struct{}
-
-func newMockSessionHandler() handler.ISessionHandler {
-	return &MockSessionHandler{}
-}
-
-func (mh *MockSessionHandler) NewSession(ctx context.Context) error {
-	return nil
-}
-
-func (mh *MockSessionHandler) GrabExistingSession(ctx context.Context) error {
-	return nil
-}
-
-func (mh *MockSessionHandler) DeleteSessions(ctx context.Context) error {
-	return nil
-}
-
-type args struct {
-	cmd string
-}
-
-func TestRun(t *testing.T) {
+func TestRunWithHandler_InvalidCommand_ReturnsErrNoSuchCmd(t *testing.T) {
 	t.Parallel()
 
-	var mu sync.RWMutex
+	configFileAbs := writeConfigFile(t, iohelper.ConfigPrefix)
 
-	tests := []struct {
-		name    string
-		args    args
-		wantErr error
-	}{
-		{
-			name: "normal case (tmux-sessionizer)",
-			args: args{
-				cmd: "",
-			},
-			wantErr: nil,
-		},
-		{
-			name: "list case (tmux-sessionizer list)",
-			args: args{
-				cmd: "list",
-			},
-			wantErr: nil,
-		},
-		{
-			name: "invalid command case",
-			args: args{
-				cmd: "invalid",
-			},
-			wantErr: ErrNoSuchCmd,
-		},
+	err := runTestCmd(t, configFileAbs, "invalid")
+
+	if !errors.Is(err, ErrNoSuchCmd) {
+		t.Errorf("expected ErrNoSuchCmd, got %v", err)
+	}
+}
+
+func TestRunWithHandler_Init_CreatesConfigFileWithPrefix(t *testing.T) {
+	t.Parallel()
+
+	configFileAbs := filepath.Join(t.TempDir(), ".tmux-sessionizer")
+
+	if err := runTestCmd(t, configFileAbs, "init"); err != nil {
+		t.Fatalf("expected no error, got %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+	if got := readConfigFile(t, configFileAbs); got != iohelper.ConfigPrefix {
+		t.Errorf("expected %q, got %q", iohelper.ConfigPrefix, got)
+	}
+}
 
-			cmd := newMockCmd()
+func TestRunWithHandler_Init_KeepsExistingConfigIntact(t *testing.T) {
+	t.Parallel()
 
-			args := []string{"tmux-sessionizer"}
-			if tt.args.cmd != "" {
-				args = append(args, tt.args.cmd)
-			}
+	content := iohelper.ConfigPrefix + "/home/user/project"
+	configFileAbs := writeConfigFile(t, content)
 
-			mu.Lock()
+	if err := runTestCmd(t, configFileAbs, "init"); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
 
-			err := cmd.Run(t.Context(), args)
+	if got := readConfigFile(t, configFileAbs); got != content {
+		t.Errorf("expected existing config to be kept as %q, got %q", content, got)
+	}
+}
 
-			mu.Unlock()
+func TestRunWithHandler_Register_AppendsFirstProjectWithoutComma(t *testing.T) {
+	t.Parallel()
 
-			if !errors.Is(err, tt.wantErr) {
-				t.Errorf("expected error %v, got %v", tt.wantErr, err)
-			}
-		})
+	configFileAbs := writeConfigFile(t, iohelper.ConfigPrefix)
+	project := t.TempDir()
+
+	if err := runTestCmd(t, configFileAbs, "register", project); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	want := iohelper.ConfigPrefix + project
+	if got := readConfigFile(t, configFileAbs); got != want {
+		t.Errorf("expected %q, got %q", want, got)
+	}
+}
+
+func TestRunWithHandler_Register_SeparatesSecondProjectWithComma(t *testing.T) {
+	t.Parallel()
+
+	configFileAbs := writeConfigFile(t, iohelper.ConfigPrefix)
+	first, second := t.TempDir(), t.TempDir()
+
+	if err := runTestCmd(t, configFileAbs, "register", first); err != nil {
+		t.Fatalf("expected no error on first register, got %v", err)
+	}
+	if err := runTestCmd(t, configFileAbs, "register", second); err != nil {
+		t.Fatalf("expected no error on second register, got %v", err)
+	}
+
+	want := iohelper.ConfigPrefix + first + "," + second
+	if got := readConfigFile(t, configFileAbs); got != want {
+		t.Errorf("expected %q, got %q", want, got)
+	}
+}
+
+//nolint:paralleltest // t.Chdir is incompatible with t.Parallel.
+func TestRunWithHandler_Register_ResolvesRelativePathToAbsolute(t *testing.T) {
+	configFileAbs := writeConfigFile(t, iohelper.ConfigPrefix)
+	parent := t.TempDir()
+	if err := os.Mkdir(filepath.Join(parent, "project"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(parent)
+
+	if err := runTestCmd(t, configFileAbs, "register", "project"); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	// Getwd resolves symlinks (e.g. /var -> /private/var on macOS),
+	// so derive the expected path from it rather than from parent.
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := iohelper.ConfigPrefix + filepath.Join(wd, "project")
+	if got := readConfigFile(t, configFileAbs); got != want {
+		t.Errorf("expected %q, got %q", want, got)
+	}
+}
+
+func TestRunWithHandler_Register_RejectsPathWithComma(t *testing.T) {
+	t.Parallel()
+
+	configFileAbs := writeConfigFile(t, iohelper.ConfigPrefix)
+	project := filepath.Join(t.TempDir(), "my,dir")
+	if err := os.Mkdir(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := runTestCmd(t, configFileAbs, "register", project); err == nil {
+		t.Error("expected error for path containing a comma, got nil")
+	}
+
+	if got := readConfigFile(t, configFileAbs); got != iohelper.ConfigPrefix {
+		t.Errorf("expected config to stay %q, got %q", iohelper.ConfigPrefix, got)
+	}
+}
+
+func TestRunWithHandler_Register_RejectsDuplicatedProject(t *testing.T) {
+	t.Parallel()
+
+	configFileAbs := writeConfigFile(t, iohelper.ConfigPrefix)
+	project := t.TempDir()
+
+	if err := runTestCmd(t, configFileAbs, "register", project); err != nil {
+		t.Fatalf("expected no error on first register, got %v", err)
+	}
+	if err := runTestCmd(t, configFileAbs, "register", project); err == nil {
+		t.Error("expected error on duplicated register, got nil")
+	}
+
+	want := iohelper.ConfigPrefix + project
+	if got := readConfigFile(t, configFileAbs); got != want {
+		t.Errorf("expected config to stay %q, got %q", want, got)
+	}
+}
+
+func TestRunWithHandler_UninitializedConfig_FailsValidation(t *testing.T) {
+	t.Parallel()
+
+	configFileAbs := writeConfigFile(t, "not a tmux-sessionizer config\n")
+
+	// "invalid" never dispatches to fzf/tmux, so reaching ErrNoSuchCmd
+	// would mean the broken config slipped through validation.
+	err := runTestCmd(t, configFileAbs, "invalid")
+
+	if err == nil {
+		t.Fatal("expected validation error, got nil")
+	}
+	if errors.Is(err, ErrNoSuchCmd) {
+		t.Errorf("expected validation error before dispatch, got ErrNoSuchCmd")
 	}
 }
