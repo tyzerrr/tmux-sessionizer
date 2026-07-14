@@ -3,44 +3,18 @@ package io
 import (
 	"errors"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/TlexCypher/my-tmux-sessionizer/internal/types"
 	"github.com/google/go-cmp/cmp"
 )
 
-type testContainer struct {
-	dirs []types.String
-}
-
-func NewTestContainer(dirs []types.String) *testContainer {
-	return &testContainer{
-		dirs: dirs,
-	}
-}
-
 func setupHomeEnv() {
 	os.Setenv("HOME", "/tmp/tmuxsessionizer")
 }
 
-func (s *testContainer) setup() {
-	setupHomeEnv()
-
-	// createProjects only collects directories that contain a ".git" child,
-	// so each expected project directory is set up as a git repository.
-	for _, p := range s.dirs {
-		_ = os.MkdirAll(filepath.Join(p.Value(), ".git"), 0755)
-	}
-}
-
-func (s *testContainer) teardown() {
-	for _, p := range s.dirs {
-		_ = os.RemoveAll(p.Value())
-	}
-}
-
 func Test_ConfigParser_parse(t *testing.T) {
+	setupHomeEnv()
 	t.Parallel()
 
 	tests := []struct {
@@ -50,15 +24,28 @@ func Test_ConfigParser_parse(t *testing.T) {
 		wantErr     error
 	}{
 		{
-			name: "including tilde(~) expansion and '\n'",
+			name: "including tilde(~) expansion and trailing slash",
 			projectList: []string{
 				"~/projects/",
 			},
 			want: &Config{
 				Projects: []types.String{
-					types.NewString("/tmp/tmuxsessionizer/projects/project1"),
-					types.NewString("/tmp/tmuxsessionizer/projects/project2"),
-					types.NewString("/tmp/tmuxsessionizer/projects/project3"),
+					types.NewString("/tmp/tmuxsessionizer/projects"),
+				},
+			},
+			wantErr: nil,
+		},
+		{
+			name: "multiple entries, surrounding blanks and empty entries are normalized",
+			projectList: []string{
+				" ~/personal ",
+				"",
+				"~/projects",
+			},
+			want: &Config{
+				Projects: []types.String{
+					types.NewString("/tmp/tmuxsessionizer/personal"),
+					types.NewString("/tmp/tmuxsessionizer/projects"),
 				},
 			},
 			wantErr: nil,
@@ -66,10 +53,6 @@ func Test_ConfigParser_parse(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		c := NewTestContainer(tt.want.Projects)
-		c.setup()
-		t.Cleanup(c.teardown)
-
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 

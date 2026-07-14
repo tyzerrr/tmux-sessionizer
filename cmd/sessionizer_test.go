@@ -3,10 +3,12 @@ package cmd
 import (
 	"context"
 	"errors"
+	"os"
 	"sync"
 	"testing"
 
 	"github.com/TlexCypher/my-tmux-sessionizer/handler"
+	iohelper "github.com/TlexCypher/my-tmux-sessionizer/internal/io"
 	"github.com/urfave/cli/v3"
 )
 
@@ -19,8 +21,22 @@ func newMockCmd() *cli.Command {
 }
 
 func mockRun(ctx context.Context, cmd *cli.Command) error {
+	// runWithHandler validates the config file before dispatching,
+	// so even mocked runs need a real, initialized config file.
+	f, err := os.CreateTemp("", "tmux-sessionizer-config")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(f.Name())
+	defer f.Close()
+
+	if _, err := f.WriteString(iohelper.ConfigPrefix); err != nil {
+		return err
+	}
+
 	mh := newMockSessionHandler()
-	return runWithHandler(mh, ctx, cmd)
+	ph := handler.NewProjectHandler(f.Name())
+	return runWithHandler(ctx, mh, ph, cmd, f.Name())
 }
 
 type MockSessionHandler struct{}
