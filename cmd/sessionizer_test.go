@@ -5,11 +5,19 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	iohelper "github.com/TlexCypher/my-tmux-sessionizer/internal/io"
 	"github.com/urfave/cli/v3"
 )
+
+// urfave/cli/v3 mutates package-level state (HelpFlag etc.) inside
+// Command.Run, so concurrent Runs from parallel tests trip the race
+// detector even though each test builds its own Command.
+//
+//nolint:gochecknoglobals // must be shared across parallel tests to serialize Run.
+var cmdRunMu sync.Mutex
 
 // runTestCmd drives runWithHandler through a real cli.Command with a
 // temporary config file, so tests exercise the actual dispatch logic
@@ -25,6 +33,8 @@ func runTestCmd(t *testing.T, configFileAbs string, args ...string) error {
 		},
 	}
 
+	cmdRunMu.Lock()
+	defer cmdRunMu.Unlock()
 	return cmd.Run(t.Context(), append([]string{"tmux-sessionizer"}, args...))
 }
 
