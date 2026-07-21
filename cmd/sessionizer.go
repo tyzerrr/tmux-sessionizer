@@ -166,7 +166,7 @@ func registerProject(
 	}
 
 	register := types.NewString(registerAbs)
-	for _, project := range config.Projects {
+	for _, project := range config.Registered {
 		if register.Value() == project.Value() {
 			return errors.New("tmux-sessionizer does not allow duplicated project registration")
 		}

@@ -17,15 +17,23 @@ func Test_ConfigParser_parse(t *testing.T) {
 	setupHomeEnv()
 	t.Parallel()
 
-	// parse skips entries whose directory does not exist, so create every
-	// directory the cases expect and guarantee the "ghost" one is absent —
-	// otherwise the results would depend on leftovers in /tmp.
-	for _, dir := range []string{"/tmp/tmuxsessionizer/projects", "/tmp/tmuxsessionizer/personal"} {
+	// parse returns the immediate subdirectories of each registered entry,
+	// so rebuild the fixture tree from scratch — otherwise the results
+	// would depend on leftovers in /tmp.
+	if err := os.RemoveAll("/tmp/tmuxsessionizer"); err != nil {
+		t.Fatal(err)
+	}
+	for _, dir := range []string{
+		"/tmp/tmuxsessionizer/projects/app",
+		"/tmp/tmuxsessionizer/projects/tool",
+		"/tmp/tmuxsessionizer/personal/blog",
+	} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := os.RemoveAll("/tmp/tmuxsessionizer/ghost"); err != nil {
+	// plain files are not session candidates and must be ignored
+	if err := os.WriteFile("/tmp/tmuxsessionizer/projects/README.md", []byte("readme"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -41,8 +49,12 @@ func Test_ConfigParser_parse(t *testing.T) {
 				"~/projects/",
 			},
 			want: &Config{
-				Projects: []types.String{
+				Registered: []types.String{
 					types.NewString("/tmp/tmuxsessionizer/projects"),
+				},
+				Projects: []types.String{
+					types.NewString("/tmp/tmuxsessionizer/projects/app"),
+					types.NewString("/tmp/tmuxsessionizer/projects/tool"),
 				},
 			},
 			wantErr: nil,
@@ -55,22 +67,32 @@ func Test_ConfigParser_parse(t *testing.T) {
 				"~/projects",
 			},
 			want: &Config{
-				Projects: []types.String{
+				Registered: []types.String{
 					types.NewString("/tmp/tmuxsessionizer/personal"),
 					types.NewString("/tmp/tmuxsessionizer/projects"),
+				},
+				Projects: []types.String{
+					types.NewString("/tmp/tmuxsessionizer/personal/blog"),
+					types.NewString("/tmp/tmuxsessionizer/projects/app"),
+					types.NewString("/tmp/tmuxsessionizer/projects/tool"),
 				},
 			},
 			wantErr: nil,
 		},
 		{
-			name: "entries whose directory does not exist are skipped",
+			name: "entries whose directory does not exist are kept as registered but yield no projects",
 			projectList: []string{
 				"~/ghost",
 				"~/projects",
 			},
 			want: &Config{
-				Projects: []types.String{
+				Registered: []types.String{
+					types.NewString("/tmp/tmuxsessionizer/ghost"),
 					types.NewString("/tmp/tmuxsessionizer/projects"),
+				},
+				Projects: []types.String{
+					types.NewString("/tmp/tmuxsessionizer/projects/app"),
+					types.NewString("/tmp/tmuxsessionizer/projects/tool"),
 				},
 			},
 			wantErr: nil,
@@ -84,12 +106,16 @@ func Test_ConfigParser_parse(t *testing.T) {
 			cp := NewConfigParser()
 			got, err := cp.parse(tt.projectList, NewFiler())
 
-			if diff := cmp.Diff(tt.want.Projects, got.Projects, []cmp.Option{
+			opts := []cmp.Option{
 				cmp.Comparer(func(a, b types.String) bool {
 					return a.Value() == b.Value()
 				}),
-			}...); diff != "" {
-				t.Errorf("ConfigParser.parse() mismatch (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tt.want.Registered, got.Registered, opts...); diff != "" {
+				t.Errorf("ConfigParser.parse() Registered mismatch (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tt.want.Projects, got.Projects, opts...); diff != "" {
+				t.Errorf("ConfigParser.parse() Projects mismatch (-want +got):\n%s", diff)
 			}
 
 			if !errors.Is(tt.wantErr, err) {

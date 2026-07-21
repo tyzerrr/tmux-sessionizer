@@ -14,12 +14,17 @@ const (
 )
 
 type Config struct {
-	Projects []types.String
+	// Registered holds the normalized root directories listed in the config
+	// file, while Projects holds their immediate subdirectories. Duplicate
+	// registration must be checked against Registered, not Projects.
+	Registered []types.String
+	Projects   []types.String
 }
 
 func newConfig() *Config {
 	return &Config{
-		Projects: []types.String{},
+		Registered: []types.String{},
+		Projects:   []types.String{},
 	}
 }
 
@@ -74,6 +79,10 @@ func (c *ConfigParser) parse(projectList []string, filer *Filer) (*Config, error
 		if err != nil {
 			return nil, err
 		}
+
+		// Record the entry even when its directory is gone: it still lives in
+		// the config file, so re-registering it would duplicate the line.
+		config.Registered = append(config.Registered, types.NewString(absPath))
 
 		if err := filer.Exists(absPath); err != nil {
 			// NOTE: registered directory might be deleted, we need to skip in this case.
