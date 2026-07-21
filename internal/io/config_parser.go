@@ -79,7 +79,23 @@ func (c *ConfigParser) parse(projectList []string, filer *Filer) (*Config, error
 			// NOTE: registered directory might be deleted, we need to skip in this case.
 			continue
 		}
-		c.createProjects(config, absPath)
+
+		entries, err := os.ReadDir(absPath)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			path := filepath.Join(absPath, e.Name())
+			if err := filer.Exists(path); err != nil {
+				return nil, err
+			}
+			c.createProjects(config, path)
+		}
+
 	}
 
 	return config, nil
