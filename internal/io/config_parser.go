@@ -104,7 +104,6 @@ func (c *ConfigParser) parse(projectList []string, filer *Filer) (*Config, error
 			}
 			c.createProjects(config, path)
 		}
-
 	}
 
 	return config, nil

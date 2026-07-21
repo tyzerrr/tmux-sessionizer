@@ -10,6 +10,9 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+// raw fzf output keeps the trailing newline, so several cases feed this form.
+const project1RawInput = "/path/to/project1\n"
+
 func TestSessionManager_CreateSession(t *testing.T) {
 	t.Parallel()
 
@@ -21,8 +24,8 @@ func TestSessionManager_CreateSession(t *testing.T) {
 	}{
 		{
 			name:        "Create new session even for including newline characters",
-			sessionName: "/path/to/project1\n",
-			path:        "/path/to/project1\n",
+			sessionName: project1RawInput,
+			path:        project1RawInput,
 			want: &Session{
 				Name:        types.NewString("/path/to/project1"),
 				ProjectPath: types.NewString("/path/to/project1"),
@@ -177,7 +180,7 @@ func TestSesssionManager_GetSession(t *testing.T) {
 	}{
 		{
 			name:    "Get existing session",
-			path:    "/path/to/project1\n",
+			path:    project1RawInput,
 			want:    session1,
 			wantErr: nil,
 		},

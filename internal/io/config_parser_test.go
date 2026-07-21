@@ -33,6 +33,7 @@ func Test_ConfigParser_parse(t *testing.T) {
 		}
 	}
 	// plain files are not session candidates and must be ignored
+	//nolint:gosec // the fixture must live under the fixed fake HOME shared with filer_test, not t.TempDir.
 	if err := os.WriteFile("/tmp/tmuxsessionizer/projects/README.md", []byte("readme"), 0o600); err != nil {
 		t.Fatal(err)
 	}

@@ -1,5 +1,7 @@
 package session
 
+import "slices"
+
 type TransformRule struct {
 	Forward  func(string) string
 	Backward func(string) string
@@ -37,8 +39,8 @@ func (tf *Transformer) Transform(in string) string {
 }
 
 func (tf *Transformer) Revert(in string) string {
-	for i := len(tf.rules) - 1; i >= 0; i-- {
-		in = tf.rules[i].Backward(in)
+	for _, rule := range slices.Backward(tf.rules) {
+		in = rule.Backward(in)
 	}
 
 	return in
